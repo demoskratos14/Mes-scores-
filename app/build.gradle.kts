@@ -37,6 +37,15 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.15"
     }
+
+    // Renomme le fichier APK généré : "Mes scores-debug.apk", "Mes scores-release.apk", etc.
+    // au lieu du nom par défaut "app-debug.apk" basé sur le nom du module.
+    applicationVariants.all {
+        outputs.all {
+            val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            outputImpl.outputFileName = "Mes scores-${name}.apk"
+        }
+    }
 }
 
 dependencies {
