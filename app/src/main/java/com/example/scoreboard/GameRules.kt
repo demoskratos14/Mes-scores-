@@ -10,6 +10,29 @@ enum class ScoreMode {
     VARIABLE_TEAMS
 }
 
+/** Type de condition qui termine la partie. */
+enum class EndConditionType {
+    /** La partie ne se termine jamais automatiquement. */
+    NONE,
+    /** La partie se termine après un nombre de manches donné. */
+    ROUND_COUNT,
+    /** La partie se termine dès qu'un joueur atteint (ou dépasse) un score donné. */
+    SCORE_THRESHOLD
+}
+
+/**
+ * Condition de fin de partie.
+ *
+ * @param roundCount utilisé si [type] == ROUND_COUNT : nombre de manches jouées avant la fin.
+ * @param scoreThreshold utilisé si [type] == SCORE_THRESHOLD : score qui déclenche la fin
+ *   dès qu'un joueur l'atteint ou le dépasse.
+ */
+data class EndCondition(
+    val type: EndConditionType = EndConditionType.NONE,
+    val roundCount: Int? = null,
+    val scoreThreshold: Int? = null
+)
+
 /**
  * Une règle de score définie par l'utilisateur, ex : "Petit" ×2, "Garde" ×3 +10.
  * Appliquée au score de base saisi : (base × factor) + bonus, puis signé.
@@ -30,6 +53,7 @@ data class ScoreMultiplier(
  * @param multipliers règles disponibles (multiplicateur + bonus fixe). Contient toujours
  *   au moins la règle "Normal" (×1 +0). Utilisé en mode TABLE et VARIABLE_TEAMS.
  * @param scoreMode détermine l'écran de saisie utilisé pour ce jeu.
+ * @param endCondition détermine quand la partie est considérée comme terminée.
  */
 data class GameRules(
     val id: String,
@@ -37,7 +61,8 @@ data class GameRules(
     val lowestWins: Boolean = false,
     val allowNegativeScores: Boolean = false,
     val multipliers: List<ScoreMultiplier> = listOf(NORMAL_MULTIPLIER),
-    val scoreMode: ScoreMode = ScoreMode.TABLE
+    val scoreMode: ScoreMode = ScoreMode.TABLE,
+    val endCondition: EndCondition = EndCondition()
 ) {
     companion object {
         const val NORMAL_MULTIPLIER_ID = "normal"

@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 
 /**
@@ -37,6 +38,7 @@ data class TeamRound(
 /**
  * Gère l'état complet d'une partie, quel que soit son [ScoreMode] :
  * - la liste des noms de joueurs et les règles du jeu choisi
+ * - une couleur distincte assignée aléatoirement à chaque joueur
  * - mode TABLE : une grille de cases [CellState], avec ajout automatique de manche
  * - mode COUNTER : un total par joueur, modifiable par +1/-1
  * - mode VARIABLE_TEAMS : un historique de [TeamRound]
@@ -47,6 +49,10 @@ class ScoreViewModel : ViewModel() {
         private set
 
     var gameRules by mutableStateOf(GameRules(id = "default", name = "Jeu classique"))
+        private set
+
+    /** Une couleur distincte par joueur (même index que [players]), tirée au sort à chaque nouvelle partie. */
+    var playerColors by mutableStateOf<List<Color>>(emptyList())
         private set
 
     // --- Mode TABLE ---
@@ -63,12 +69,21 @@ class ScoreViewModel : ViewModel() {
 
     companion object {
         private const val INITIAL_ROUNDS = 5
+
+        // Palette de couleurs suffisamment contrastées entre elles pour rester lisibles
+        // une fois utilisées comme fond de case ou comme couleur de texte.
+        private val COLOR_PALETTE = listOf(
+            Color(0xFFE53935), Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFFB8C00),
+            Color(0xFF8E24AA), Color(0xFF00897B), Color(0xFFD81B60), Color(0xFF3949AB),
+            Color(0xFF6D4C41), Color(0xFF7CB342), Color(0xFFF4511E), Color(0xFF546E7A)
+        )
     }
 
     /** Démarre une nouvelle partie avec la liste de noms et les règles de score fournies. */
     fun initGame(playerNames: List<String>, rules: GameRules) {
         players = playerNames
         gameRules = rules
+        playerColors = assignColors(playerNames.size)
         _scores.clear()
         _counters.clear()
         _teamRounds.clear()
@@ -77,6 +92,12 @@ class ScoreViewModel : ViewModel() {
             ScoreMode.COUNTER -> repeat(playerNames.size) { _counters.add(0) }
             ScoreMode.VARIABLE_TEAMS -> Unit
         }
+    }
+
+    private fun assignColors(count: Int): List<Color> {
+        if (count == 0) return emptyList()
+        val shuffled = COLOR_PALETTE.shuffled()
+        return List(count) { i -> shuffled[i % shuffled.size] }
     }
 
     // ---------- Mode TABLE ----------
@@ -90,9 +111,10 @@ class ScoreViewModel : ViewModel() {
     /**
      * À appeler après toute modification d'une case (valeur, signe ou règle appliquée).
      * Ajoute une nouvelle manche vide si la dernière manche existante contient
-     * désormais au moins un score.
+     * désormais au moins un score, sauf si la partie est déjà terminée.
      */
     fun notifyCellChanged(round: Int) {
+        if (isGameOver()) return
         if (round == _scores.lastIndex && _scores[round].any { it.baseValue != null }) {
             addRound()
         }
@@ -112,6 +134,7 @@ class ScoreViewModel : ViewModel() {
     // ---------- Mode COUNTER ----------
 
     fun incrementCounter(player: Int, delta: Int) {
+        if (isGameOver()) return
         if (player !in _counters.indices) return
         _counters[player] = _counters[player] + delta
     }
@@ -154,4 +177,30 @@ class ScoreViewModel : ViewModel() {
 
     /** Rang (1 = premier) d'un joueur donné. */
     fun rankOf(player: Int): Int = rankingOrder().indexOf(player) + 1
+
+    /** Nombre de manches réellement jouées (au moins une case remplie), pour TABLE et VARIABLE_TEAMS. */
+    fun roundsPlayed(): Int = when (gameRules.scoreMode) {
+        ScoreMode.TABLE -> _scores.count { round -> round.any { it.baseValue != null } }
+        ScoreMode.VARIABLE_TEAMS -> _teamRounds.size
+        ScoreMode.COUNTER -> 0
+    }
+
+    /** Vrai si la condition de fin de partie définie par les règles du jeu est atteinte. */
+    fun isGameOver(): Boolean {
+        val condition = gameRules.endCondition
+        return when (condition.type) {
+            EndConditionType.NONE -> false
+            EndConditionType.ROUND_COUNT -> {
+                val limit = condition.roundCount ?: return false
+                roundsPlayed() >= limit
+            }
+            EndConditionType.SCORE_THRESHOLD -> {
+                val threshold = condition.scoreThreshold ?: return false
+                players.indices.any { totalFor(it) >= threshold }
+            }
+        }
+    }
+
+    /** Index du joueur en tête si la partie est terminée, sinon null. */
+    fun winner(): Int? = if (isGameOver() && players.isNotEmpty()) rankingOrder().firstOrNull() else null
 }

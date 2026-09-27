@@ -3,6 +3,8 @@ package com.example.scoreboard
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,6 +23,9 @@ import androidx.navigation.compose.rememberNavController
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Nécessaire pour que Modifier.imePadding() fonctionne correctement et que le
+        // contenu remonte automatiquement au-dessus du clavier au lieu d'être masqué.
+        enableEdgeToEdge()
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -37,6 +42,8 @@ fun ScoreApp() {
     // Le ViewModel est créé ici, au niveau du graphe de navigation,
     // afin d'être partagé entre tous les écrans.
     val viewModel: ScoreViewModel = viewModel()
+    // Vit au même niveau que ScoreViewModel pour continuer de tourner sur tous les écrans.
+    val timerViewModel: TimerViewModel = viewModel()
 
     val context = LocalContext.current
     val gameRepository = remember { GameRepository(context) }
@@ -51,55 +58,60 @@ fun ScoreApp() {
         ScoreMode.VARIABLE_TEAMS -> "teamRounds"
     }
 
-    NavHost(navController = navController, startDestination = "setup") {
-        composable("setup") {
-            SetupScreen(
-                onNext = { names ->
-                    pendingPlayerNames = names
-                    navController.navigate("chooseGame")
-                }
-            )
-        }
-        composable("chooseGame") {
-            ChooseGameScreen(
-                repository = gameRepository,
-                onGameChosen = { rules ->
-                    viewModel.initGame(pendingPlayerNames, rules)
-                    navController.navigate(scoreRouteFor(rules))
-                },
-                onCreateNewGame = {
-                    navController.navigate("createGame")
-                }
-            )
-        }
-        composable("createGame") {
-            CreateGameScreen(
-                repository = gameRepository,
-                onGameCreated = { rules ->
-                    viewModel.initGame(pendingPlayerNames, rules)
-                    navController.navigate(scoreRouteFor(rules)) {
-                        popUpTo("chooseGame") { inclusive = true }
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(navController = navController, startDestination = "setup") {
+            composable("setup") {
+                SetupScreen(
+                    onNext = { names ->
+                        pendingPlayerNames = names
+                        navController.navigate("chooseGame")
                     }
-                }
-            )
+                )
+            }
+            composable("chooseGame") {
+                ChooseGameScreen(
+                    repository = gameRepository,
+                    onGameChosen = { rules ->
+                        viewModel.initGame(pendingPlayerNames, rules)
+                        navController.navigate(scoreRouteFor(rules))
+                    },
+                    onCreateNewGame = {
+                        navController.navigate("createGame")
+                    }
+                )
+            }
+            composable("createGame") {
+                CreateGameScreen(
+                    repository = gameRepository,
+                    onGameCreated = { rules ->
+                        viewModel.initGame(pendingPlayerNames, rules)
+                        navController.navigate(scoreRouteFor(rules)) {
+                            popUpTo("chooseGame") { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable("score") {
+                ScoreScreen(viewModel = viewModel)
+            }
+            composable("counter") {
+                CounterScreen(viewModel = viewModel)
+            }
+            composable("teamRounds") {
+                TeamRoundsScreen(
+                    viewModel = viewModel,
+                    onAddRound = { navController.navigate("newTeamRound") }
+                )
+            }
+            composable("newTeamRound") {
+                NewTeamRoundScreen(
+                    viewModel = viewModel,
+                    onDone = { navController.popBackStack() }
+                )
+            }
         }
-        composable("score") {
-            ScoreScreen(viewModel = viewModel)
-        }
-        composable("counter") {
-            CounterScreen(viewModel = viewModel)
-        }
-        composable("teamRounds") {
-            TeamRoundsScreen(
-                viewModel = viewModel,
-                onAddRound = { navController.navigate("newTeamRound") }
-            )
-        }
-        composable("newTeamRound") {
-            NewTeamRoundScreen(
-                viewModel = viewModel,
-                onDone = { navController.popBackStack() }
-            )
-        }
+
+        // Superposé à toutes les pages ci-dessus.
+        TimerOverlay(viewModel = timerViewModel)
     }
 }

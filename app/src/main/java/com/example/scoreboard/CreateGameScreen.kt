@@ -50,6 +50,8 @@ fun CreateGameScreen(
     var lowestWins by remember { mutableStateOf(false) }
     var allowNegative by remember { mutableStateOf(false) }
     var ruleDrafts by remember { mutableStateOf(listOf<RuleDraft>()) }
+    var endConditionType by remember { mutableStateOf(EndConditionType.NONE) }
+    var endValueText by remember { mutableStateOf("") }
 
     AppBackground {
         Column(
@@ -185,6 +187,47 @@ fun CreateGameScreen(
                         }
                     }
 
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Fin de partie", style = MaterialTheme.typography.titleSmall)
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = endConditionType == EndConditionType.NONE,
+                                onClick = { endConditionType = EndConditionType.NONE },
+                                label = { Text("Aucune") }
+                            )
+                            FilterChip(
+                                selected = endConditionType == EndConditionType.ROUND_COUNT,
+                                onClick = { endConditionType = EndConditionType.ROUND_COUNT },
+                                label = { Text("Nombre de manches") }
+                            )
+                            FilterChip(
+                                selected = endConditionType == EndConditionType.SCORE_THRESHOLD,
+                                onClick = { endConditionType = EndConditionType.SCORE_THRESHOLD },
+                                label = { Text("Score atteint") }
+                            )
+                        }
+                        if (endConditionType != EndConditionType.NONE) {
+                            OutlinedTextField(
+                                value = endValueText,
+                                onValueChange = { endValueText = it.filter { c -> c.isDigit() } },
+                                label = {
+                                    Text(
+                                        if (endConditionType == EndConditionType.ROUND_COUNT) {
+                                            "Nombre de manches"
+                                        } else {
+                                            "Score à atteindre"
+                                        }
+                                    )
+                                },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
                     Button(
                         onClick = {
                             val customRules = ruleDrafts.mapIndexedNotNull { index, draft ->
@@ -196,13 +239,20 @@ fun CreateGameScreen(
                                     ScoreMultiplier(id = "custom_$index", label = draft.label, factor = factor, bonus = bonus)
                                 }
                             }
+                            val endValue = endValueText.toIntOrNull()
+                            val endCondition = when (endConditionType) {
+                                EndConditionType.NONE -> EndCondition()
+                                EndConditionType.ROUND_COUNT -> EndCondition(type = EndConditionType.ROUND_COUNT, roundCount = endValue)
+                                EndConditionType.SCORE_THRESHOLD -> EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = endValue)
+                            }
                             val rules = GameRules(
                                 id = repository.newId(),
                                 name = name.ifBlank { "Jeu sans nom" },
                                 lowestWins = lowestWins,
                                 allowNegativeScores = allowNegative,
                                 multipliers = listOf(GameRules.NORMAL_MULTIPLIER) + customRules,
-                                scoreMode = scoreMode
+                                scoreMode = scoreMode,
+                                endCondition = endCondition
                             )
                             repository.saveCustomGame(rules)
                             onGameCreated(rules)

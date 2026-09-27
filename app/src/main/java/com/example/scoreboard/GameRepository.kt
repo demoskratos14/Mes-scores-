@@ -39,7 +39,8 @@ class GameRepository(context: Context) {
             name = "Skyjo",
             lowestWins = true,
             allowNegativeScores = true,
-            scoreMode = ScoreMode.TABLE
+            scoreMode = ScoreMode.TABLE,
+            endCondition = EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = 100)
         ),
         GameRules(
             id = "builtin_tarot",
@@ -59,7 +60,8 @@ class GameRepository(context: Context) {
             name = "Belote (à 501 points)",
             lowestWins = false,
             allowNegativeScores = false,
-            scoreMode = ScoreMode.TABLE
+            scoreMode = ScoreMode.TABLE,
+            endCondition = EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = 501)
         ),
         GameRules(
             id = "builtin_rami",
@@ -117,13 +119,33 @@ class GameRepository(context: Context) {
         } catch (e: IllegalArgumentException) {
             ScoreMode.TABLE
         }
+        val endConditionJson = obj.optJSONObject("endCondition")
+        val endCondition = if (endConditionJson == null) {
+            EndCondition()
+        } else {
+            val type = try {
+                EndConditionType.valueOf(endConditionJson.optString("type", EndConditionType.NONE.name))
+            } catch (e: IllegalArgumentException) {
+                EndConditionType.NONE
+            }
+            EndCondition(
+                type = type,
+                roundCount = if (endConditionJson.has("roundCount") && !endConditionJson.isNull("roundCount")) {
+                    endConditionJson.getInt("roundCount")
+                } else null,
+                scoreThreshold = if (endConditionJson.has("scoreThreshold") && !endConditionJson.isNull("scoreThreshold")) {
+                    endConditionJson.getInt("scoreThreshold")
+                } else null
+            )
+        }
         return GameRules(
             id = obj.getString("id"),
             name = obj.getString("name"),
             lowestWins = obj.getBoolean("lowestWins"),
             allowNegativeScores = obj.getBoolean("allowNegativeScores"),
             multipliers = multipliers,
-            scoreMode = scoreMode
+            scoreMode = scoreMode,
+            endCondition = endCondition
         )
     }
 
@@ -146,6 +168,11 @@ class GameRepository(context: Context) {
                 multipliersArray.put(mObj)
             }
             obj.put("multipliers", multipliersArray)
+            val endConditionObj = JSONObject()
+            endConditionObj.put("type", g.endCondition.type.name)
+            g.endCondition.roundCount?.let { endConditionObj.put("roundCount", it) }
+            g.endCondition.scoreThreshold?.let { endConditionObj.put("scoreThreshold", it) }
+            obj.put("endCondition", endConditionObj)
             array.put(obj)
         }
         prefs.edit { putString(KEY_CUSTOM_GAMES, array.toString()) }
