@@ -1,5 +1,6 @@
 package com.example.scoreboard
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -258,6 +259,7 @@ fun ScoreScreen(viewModel: ScoreViewModel) {
  * dans la couleur du joueur.
  */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun ScoreCell(
     cell: CellState,
     allowNegative: Boolean,
