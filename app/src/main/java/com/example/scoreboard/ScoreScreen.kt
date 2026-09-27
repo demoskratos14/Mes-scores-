@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -33,22 +35,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 // Hauteurs fixes pour que toutes les colonnes restent alignées entre elles.
 private val RANK_ROW_HEIGHT = 40.dp
 private val NAME_ROW_HEIGHT = 48.dp
 private val TOTAL_ROW_HEIGHT = 56.dp
-private val LABEL_COLUMN_WIDTH = 90.dp
-private val MIN_PLAYER_COLUMN_WIDTH = 78.dp
+private val LABEL_COLUMN_WIDTH = 80.dp
+private val MIN_PLAYER_COLUMN_WIDTH = 28.dp
 private val MAX_PLAYER_COLUMN_WIDTH = 128.dp
 
 /** Renvoie du noir ou du blanc selon le fond donné, pour rester lisible. */
@@ -260,6 +265,9 @@ private fun ScoreCell(
     playerColor: Color,
     onChanged: () -> Unit
 ) {
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         if (multipliers.size > 1) {
             var expanded by remember { mutableStateOf(false) }
@@ -311,7 +319,15 @@ private fun ScoreCell(
                     )
                 }
             } else null,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp, vertical = 4.dp)
+                .bringIntoViewRequester(bringIntoViewRequester)
+                .onFocusEvent { state ->
+                    if (state.isFocused) {
+                        coroutineScope.launch { bringIntoViewRequester.bringIntoView() }
+                    }
+                },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )

@@ -1,5 +1,6 @@
 package com.example.scoreboard
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,13 +14,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -46,39 +45,36 @@ private fun formatMillis(ms: Long): String {
 }
 
 /**
- * Bouton flottant affiché en superposition sur tous les écrans de l'app (voir MainActivity.kt).
- * Ouvre une fenêtre proposant un chronomètre (temps qui monte) ou un minuteur (compte à rebours).
- * Quand il tourne, un petit badge au-dessus du bouton affiche le temps sans avoir à ouvrir la fenêtre.
+ * Badge affiché en superposition sur tous les écrans de l'app (voir MainActivity.kt),
+ * affichant en permanence le temps du chronomètre/minuteur. Cliquer dessus ouvre la
+ * fenêtre de réglage (chronomètre ou minuteur).
  */
 @Composable
 fun TimerOverlay(viewModel: TimerViewModel) {
     var showDialog by remember { mutableStateOf(false) }
+    val displayMillis = if (viewModel.mode == TimerMode.STOPWATCH) {
+        viewModel.elapsedMillis
+    } else {
+        viewModel.countdownRemainingMillis
+    }
 
     Box(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         contentAlignment = Alignment.BottomEnd
     ) {
-        Column(horizontalAlignment = Alignment.End) {
-            if (viewModel.isRunning) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.75f)),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    Text(
-                        text = if (viewModel.mode == TimerMode.STOPWATCH) {
-                            formatMillis(viewModel.elapsedMillis)
-                        } else {
-                            formatMillis(viewModel.countdownRemainingMillis)
-                        },
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
-            }
-            FloatingActionButton(onClick = { showDialog = true }) {
-                Icon(Icons.Filled.Timer, contentDescription = "Chronomètre / minuteur")
-            }
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (viewModel.isRunning) Color.Black.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.55f)
+            ),
+            modifier = Modifier.clickable { showDialog = true }
+        ) {
+            Text(
+                text = formatMillis(displayMillis),
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)
+            )
         }
     }
 
