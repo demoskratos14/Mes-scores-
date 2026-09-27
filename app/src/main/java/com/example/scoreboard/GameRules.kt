@@ -66,6 +66,52 @@ data class ScoreMultiplier(
     val bonus: Int = 0
 )
 
+/** Comment les joueurs sont regroupés pour le calcul des scores d'une manche. */
+enum class TeamMode {
+    /** Chaque joueur marque pour lui-même (ex : Skyjo, Rami, Uno). */
+    INDIVIDUAL,
+    /** Des équipes fixes tout au long de la partie (ex : Belote coinchée, Bridge classique). */
+    FIXED_TEAMS,
+    /** La composition des équipes peut changer à chaque manche (ex : Tarot). */
+    VARIABLE_PER_ROUND
+}
+
+/** Comment le score d'une manche est calculé à partir de la saisie. */
+enum class ScoringFormula {
+    /** Le score saisi est utilisé tel quel (ex : Skyjo, Rami, Uno). */
+    DIRECT_ENTRY,
+    /** Le score saisi est multiplié par une règle choisie, plus un bonus fixe (ex : Tarot). */
+    MULTIPLIER,
+    /** Le score dépend d'un contrat annoncé, réussi ou chuté (ex : Belote coinchée, Bridge). */
+    CONTRACT_CONDITIONAL
+}
+
+/** À qui s'applique un [BonusRule] au moment où il est coché pour une manche. */
+enum class BonusScope {
+    /** Le(s) gagnant(s) de la manche. */
+    ROUND_WINNER,
+    /** Le joueur ou l'équipe qui a annoncé le contrat (preneur). */
+    DECLARER,
+    /** L'équipe ou les joueurs adverses au preneur. */
+    OPPOSING_TEAM,
+    /** Tous les joueurs concernés, sans distinction. */
+    ALL_PLAYERS
+}
+
+/**
+ * Un bonus optionnel qu'on peut cocher pour une manche, réutilisable par n'importe quel jeu
+ * (ex : "Petit au bout", "Chien", "Belote-rebelote", "Capot", "Poignée").
+ *
+ * @param points valeur ajoutée (ou retranchée si négative) quand le bonus est coché.
+ * @param appliesTo à qui ce bonus profite quand il est coché.
+ */
+data class BonusRule(
+    val id: String,
+    val label: String,
+    val points: Int,
+    val appliesTo: BonusScope
+)
+
 /**
  * Règles de score propres à un jeu.
  *
@@ -76,6 +122,13 @@ data class ScoreMultiplier(
  *   au moins la règle "Normal" (×1 +0). Utilisé en mode TABLE et VARIABLE_TEAMS.
  * @param scoreMode détermine l'écran de saisie utilisé pour ce jeu.
  * @param endCondition détermine quand la partie est considérée comme terminée.
+ * @param teamMode comment les joueurs sont regroupés pour marquer (individuel, équipes fixes,
+ *   équipes variables par manche). Purement descriptif pour l'instant : ne change encore rien
+ *   au comportement, qui reste piloté par [scoreMode].
+ * @param scoringFormula comment le score d'une manche est calculé (saisie directe, multiplicateur,
+ *   contrat). Purement descriptif pour l'instant, comme [teamMode].
+ * @param roundBonuses bonus optionnels proposés à la cochée pour ce jeu (ex : "Petit au bout"
+ *   pour le Tarot). Non encore appliqués au calcul des scores.
  */
 data class GameRules(
     val id: String,
@@ -84,7 +137,10 @@ data class GameRules(
     val allowNegativeScores: Boolean = false,
     val multipliers: List<ScoreMultiplier> = listOf(NORMAL_MULTIPLIER),
     val scoreMode: ScoreMode = ScoreMode.TABLE,
-    val endCondition: EndCondition = EndCondition()
+    val endCondition: EndCondition = EndCondition(),
+    val teamMode: TeamMode = TeamMode.INDIVIDUAL,
+    val scoringFormula: ScoringFormula = ScoringFormula.DIRECT_ENTRY,
+    val roundBonuses: List<BonusRule> = emptyList()
 ) {
     /** Sérialise cette règle en JSON, pour la sauvegarde dans les SharedPreferences. */
     fun toJson(): JSONObject {
@@ -105,6 +161,19 @@ data class GameRules(
             multipliersArray.put(mObj)
         }
         obj.put("multipliers", multipliersArray)
+
+        obj.put("teamMode", teamMode.name)
+        obj.put("scoringFormula", scoringFormula.name)
+        val bonusesArray = JSONArray()
+        roundBonuses.forEach { b ->
+            val bObj = JSONObject()
+            bObj.put("id", b.id)
+            bObj.put("label", b.label)
+            bObj.put("points", b.points)
+            bObj.put("appliesTo", b.appliesTo.name)
+            bonusesArray.put(bObj)
+        }
+        obj.put("roundBonuses", bonusesArray)
 
         val endConditionObj = JSONObject()
         endConditionObj.put("type", endCondition.type.name)
@@ -174,6 +243,48 @@ data class GameRules(
                 )
             }
 
+            // Déduit des valeurs cohérentes pour les jeux déjà sauvegardés (Tarot compris),
+            // qui n'ont pas encore ces champs dans leur JSON, plutôt qu'un défaut générique faux.
+            val teamMode = if (obj.has("teamMode")) {
+                try {
+                    TeamMode.valueOf(obj.getString("teamMode"))
+                } catch (e: IllegalArgumentException) {
+                    TeamMode.INDIVIDUAL
+                }
+            } else if (scoreMode == ScoreMode.VARIABLE_TEAMS) {
+                TeamMode.VARIABLE_PER_ROUND
+            } else {
+                TeamMode.INDIVIDUAL
+            }
+
+            val scoringFormula = if (obj.has("scoringFormula")) {
+                try {
+                    ScoringFormula.valueOf(obj.getString("scoringFormula"))
+                } catch (e: IllegalArgumentException) {
+                    ScoringFormula.DIRECT_ENTRY
+                }
+            } else if (multipliers.size > 1) {
+                ScoringFormula.MULTIPLIER
+            } else {
+                ScoringFormula.DIRECT_ENTRY
+            }
+
+            val roundBonuses = obj.optJSONArray("roundBonuses")?.let { array ->
+                (0 until array.length()).map { i ->
+                    val b = array.getJSONObject(i)
+                    BonusRule(
+                        id = b.getString("id"),
+                        label = b.getString("label"),
+                        points = b.getInt("points"),
+                        appliesTo = try {
+                            BonusScope.valueOf(b.optString("appliesTo", BonusScope.ALL_PLAYERS.name))
+                        } catch (e: IllegalArgumentException) {
+                            BonusScope.ALL_PLAYERS
+                        }
+                    )
+                }
+            } ?: emptyList()
+
             return GameRules(
                 id = obj.getString("id"),
                 name = obj.getString("name"),
@@ -181,7 +292,10 @@ data class GameRules(
                 allowNegativeScores = obj.getBoolean("allowNegativeScores"),
                 multipliers = multipliers,
                 scoreMode = scoreMode,
-                endCondition = endCondition
+                endCondition = endCondition,
+                teamMode = teamMode,
+                scoringFormula = scoringFormula,
+                roundBonuses = roundBonuses
             )
         }
     }

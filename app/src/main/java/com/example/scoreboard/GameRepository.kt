@@ -40,6 +40,8 @@ class GameRepository(context: Context) {
             lowestWins = false,
             allowNegativeScores = true,
             scoreMode = ScoreMode.VARIABLE_TEAMS,
+            teamMode = TeamMode.VARIABLE_PER_ROUND,
+            scoringFormula = ScoringFormula.MULTIPLIER,
             multipliers = listOf(
                 GameRules.NORMAL_MULTIPLIER.copy(label = "Petite"),
                 ScoreMultiplier(id = "tarot_garde", label = "Garde", factor = 2),
