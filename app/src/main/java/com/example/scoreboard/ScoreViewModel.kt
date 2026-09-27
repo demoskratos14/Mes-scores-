@@ -6,7 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
+import java.util.UUID
 
 /**
  * État d'une case du tableau (mode TABLE) : la magnitude saisie (toujours positive
@@ -55,6 +57,15 @@ class ScoreViewModel : ViewModel() {
     var playerColors by mutableStateOf<List<Color>>(emptyList())
         private set
 
+    /**
+     * Identifie la partie en cours dans le journal ([GameHistoryRepository]). Null tant
+     * qu'elle n'a jamais été enregistrée ; fixé au premier appel à [snapshot], puis
+     * réutilisé pour que les enregistrements suivants mettent à jour la même entrée
+     * au lieu d'en créer une nouvelle à chaque fois.
+     */
+    var currentSaveId: String? by mutableStateOf(null)
+        private set
+
     // --- Mode TABLE ---
     private val _scores = mutableStateListOf<SnapshotStateList<CellState>>()
     val scores: List<SnapshotStateList<CellState>> get() = _scores
@@ -84,6 +95,7 @@ class ScoreViewModel : ViewModel() {
         players = playerNames
         gameRules = rules
         playerColors = assignColors(playerNames.size)
+        currentSaveId = null
         _scores.clear()
         _counters.clear()
         _teamRounds.clear()
@@ -92,6 +104,72 @@ class ScoreViewModel : ViewModel() {
             ScoreMode.COUNTER -> repeat(playerNames.size) { _counters.add(0) }
             ScoreMode.VARIABLE_TEAMS -> Unit
         }
+    }
+
+    /** Restaure une partie précédemment enregistrée dans le journal, telle quelle. */
+    fun loadFromSaved(saved: SavedGame) {
+        currentSaveId = saved.id
+        players = saved.players
+        gameRules = saved.gameRules
+        playerColors = if (saved.playerColorsArgb.size == saved.players.size) {
+            saved.playerColorsArgb.map { Color(it) }
+        } else {
+            assignColors(saved.players.size)
+        }
+        _scores.clear()
+        _counters.clear()
+        _teamRounds.clear()
+        when (saved.gameRules.scoreMode) {
+            ScoreMode.TABLE -> {
+                val rounds = saved.cellSnapshots
+                if (rounds.isNullOrEmpty()) {
+                    repeat(INITIAL_ROUNDS) { addRound() }
+                } else {
+                    rounds.forEach { roundSnapshot ->
+                        val row = mutableStateListOf<CellState>()
+                        roundSnapshot.forEach { snap ->
+                            row.add(
+                                CellState().apply {
+                                    baseValue = snap.baseValue
+                                    isNegative = snap.isNegative
+                                    multiplierId = snap.multiplierId
+                                }
+                            )
+                        }
+                        _scores.add(row)
+                    }
+                }
+            }
+            ScoreMode.COUNTER -> {
+                val counters = saved.counters
+                if (counters.isNullOrEmpty()) {
+                    repeat(saved.players.size) { _counters.add(0) }
+                } else {
+                    counters.forEach { _counters.add(it) }
+                }
+            }
+            ScoreMode.VARIABLE_TEAMS -> {
+                saved.teamRounds?.forEach { _teamRounds.add(it) }
+            }
+        }
+    }
+
+    /** Capture l'état actuel de la partie, prêt à être enregistré dans le journal via [GameHistoryRepository]. */
+    fun snapshot(): SavedGame {
+        val id = currentSaveId ?: UUID.randomUUID().toString().also { currentSaveId = it }
+        return SavedGame(
+            id = id,
+            savedAt = System.currentTimeMillis(),
+            gameRules = gameRules,
+            players = players,
+            playerColorsArgb = playerColors.map { it.toArgb() },
+            cellSnapshots = if (gameRules.scoreMode == ScoreMode.TABLE) {
+                _scores.map { round -> round.map { CellSnapshot(it.baseValue, it.isNegative, it.multiplierId) } }
+            } else null,
+            counters = if (gameRules.scoreMode == ScoreMode.COUNTER) _counters.toList() else null,
+            teamRounds = if (gameRules.scoreMode == ScoreMode.VARIABLE_TEAMS) _teamRounds.toList() else null,
+            isFinished = isGameOver()
+        )
     }
 
     private fun assignColors(count: Int): List<Color> {

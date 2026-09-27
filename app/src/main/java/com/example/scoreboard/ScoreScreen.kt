@@ -1,13 +1,14 @@
 package com.example.scoreboard
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -33,6 +35,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +50,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Hauteurs fixes pour que toutes les colonnes restent alignées entre elles.
@@ -64,7 +68,7 @@ private fun contentColorFor(background: Color): Color {
 }
 
 @Composable
-fun ScoreScreen(viewModel: ScoreViewModel) {
+fun ScoreScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryRepository) {
     val players = viewModel.players
     val playerColors = viewModel.playerColors
     val scores = viewModel.scores
@@ -81,6 +85,15 @@ fun ScoreScreen(viewModel: ScoreViewModel) {
     // du tableau, pour que les colonnes restent alignées quand on défile latéralement.
     val horizontalScrollState = rememberScrollState()
 
+    // Confirmation temporaire affichée après un clic sur "Enregistrer".
+    var justSaved by remember { mutableStateOf(false) }
+    LaunchedEffect(justSaved) {
+        if (justSaved) {
+            delay(2000)
+            justSaved = false
+        }
+    }
+
     AppBackground {
         Column(
             modifier = Modifier
@@ -88,17 +101,40 @@ fun ScoreScreen(viewModel: ScoreViewModel) {
                 .padding(16.dp)
                 .imePadding()
         ) {
-            Text(
-                text = "Feuille de scores",
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color.White
-            )
-            Text(
-                text = viewModel.gameRules.name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.85f),
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Feuille de scores",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White
+                    )
+                    Text(
+                        text = viewModel.gameRules.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Button(onClick = {
+                        historyRepository.saveGame(viewModel.snapshot())
+                        justSaved = true
+                    }) {
+                        Text("Enregistrer")
+                    }
+                    if (justSaved) {
+                        Text(
+                            text = "Partie enregistrée",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (viewModel.isGameOver()) {
                 val winner = viewModel.winner()
@@ -259,7 +295,6 @@ fun ScoreScreen(viewModel: ScoreViewModel) {
  * dans la couleur du joueur.
  */
 @Composable
-@OptIn(ExperimentalFoundationApi::class)
 private fun ScoreCell(
     cell: CellState,
     allowNegative: Boolean,

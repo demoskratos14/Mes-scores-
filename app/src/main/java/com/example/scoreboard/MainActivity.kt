@@ -47,6 +47,7 @@ fun ScoreApp() {
 
     val context = LocalContext.current
     val gameRepository = remember { GameRepository(context) }
+    val gameHistoryRepository = remember { GameHistoryRepository(context) }
 
     // Noms saisis à l'étape 1, en attente d'être associés à un jeu à l'étape 2.
     var pendingPlayerNames by remember { mutableStateOf(listOf<String>()) }
@@ -65,7 +66,22 @@ fun ScoreApp() {
                     onNext = { names ->
                         pendingPlayerNames = names
                         navController.navigate("chooseGame")
+                    },
+                    onOpenJournal = {
+                        navController.navigate("journal")
                     }
+                )
+            }
+            composable("journal") {
+                GameHistoryScreen(
+                    repository = gameHistoryRepository,
+                    onResumeGame = { saved ->
+                        viewModel.loadFromSaved(saved)
+                        navController.navigate(scoreRouteFor(saved.gameRules)) {
+                            popUpTo("setup")
+                        }
+                    },
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("chooseGame") {
@@ -92,14 +108,15 @@ fun ScoreApp() {
                 )
             }
             composable("score") {
-                ScoreScreen(viewModel = viewModel)
+                ScoreScreen(viewModel = viewModel, historyRepository = gameHistoryRepository)
             }
             composable("counter") {
-                CounterScreen(viewModel = viewModel)
+                CounterScreen(viewModel = viewModel, historyRepository = gameHistoryRepository)
             }
             composable("teamRounds") {
                 TeamRoundsScreen(
                     viewModel = viewModel,
+                    historyRepository = gameHistoryRepository,
                     onAddRound = { navController.navigate("newTeamRound") }
                 )
             }

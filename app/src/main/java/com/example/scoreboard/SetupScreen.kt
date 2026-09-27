@@ -16,6 +16,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,7 +30,8 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun SetupScreen(
-    onNext: (List<String>) -> Unit
+    onNext: (List<String>) -> Unit,
+    onOpenJournal: () -> Unit
 ) {
     var playerCountText by remember { mutableStateOf("2") }
     val playerCount = (playerCountText.toIntOrNull() ?: 2).coerceIn(1, 12)
@@ -100,6 +102,13 @@ fun SetupScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Continuer")
+                    }
+
+                    TextButton(
+                        onClick = onOpenJournal,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Journal des parties")
                     }
                 }
             }
