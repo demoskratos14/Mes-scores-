@@ -1,45 +1,43 @@
 package com.example.scoreboard
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenu
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChooseGameScreen(
     repository: GameRepository,
     onGameChosen: (GameRules) -> Unit,
     onCreateNewGame: () -> Unit
 ) {
-    // Recalculé à chaque recomposition de cet écran, donc un jeu tout juste
-    // créé apparaît bien dans la liste au retour depuis l'écran de création.
-    val games = remember { mutableStateOf(repository.allGames()) }.value
-    var selected by remember { mutableStateOf<GameRules?>(null) }
+    val games = remember { repository.allGames() }
+    var selected by remember {
+        mutableStateOf(games.firstOrNull { it.id == "builtin_generic" } ?: games.first())
+    }
+    var expanded by remember { mutableStateOf(false) }
 
     AppBackground {
         Column(
@@ -52,42 +50,52 @@ fun ChooseGameScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text("Quel jeu ?", style = MaterialTheme.typography.headlineMedium)
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 320.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it }
                     ) {
-                        games.forEach { game ->
-                            val isSelected = selected?.id == game.id
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selected = game }
-                                    .background(
-                                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(selected = isSelected, onClick = { selected = game })
-                                Column {
-                                    Text(game.name, fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        text = ruleSummary(game),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                        OutlinedTextField(
+                            value = selected.name,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Jeu") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            games.forEach { game ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(game.name)
+                                            Text(
+                                                text = ruleSummary(game),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        selected = game
+                                        expanded = false
+                                    }
+                                )
                             }
                         }
                     }
+
+                    Text(
+                        text = ruleSummary(selected),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
                     OutlinedButton(
                         onClick = onCreateNewGame,
@@ -97,8 +105,7 @@ fun ChooseGameScreen(
                     }
 
                     Button(
-                        onClick = { selected?.let(onGameChosen) },
-                        enabled = selected != null,
+                        onClick = { onGameChosen(selected) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Continuer")

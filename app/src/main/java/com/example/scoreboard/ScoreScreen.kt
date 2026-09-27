@@ -1,6 +1,7 @@
 package com.example.scoreboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -32,19 +35,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
-// Hauteurs fixes pour que toutes les colonnes restent alignées entre elles.
+// Hauteurs/largeurs fixes pour que toutes les colonnes restent alignées entre elles.
 private val RANK_ROW_HEIGHT = 40.dp
 private val NAME_ROW_HEIGHT = 48.dp
-private val SCORE_ROW_HEIGHT = 56.dp
 private val TOTAL_ROW_HEIGHT = 56.dp
 private val LABEL_COLUMN_WIDTH = 90.dp
-private val PLAYER_COLUMN_WIDTH = 110.dp
+private val PLAYER_COLUMN_WIDTH = 128.dp
 
 @Composable
 fun ScoreScreen(viewModel: ScoreViewModel) {
     val players = viewModel.players
     val scores = viewModel.scores
     val rankingOrder = viewModel.rankingOrder()
+    val multipliers = viewModel.gameRules.multipliers
+    val hasCustomMultipliers = multipliers.size > 1
+    // Un peu plus de hauteur par case quand le sélecteur de règle est affiché.
+    val scoreRowHeight = if (hasCustomMultipliers) 92.dp else 72.dp
 
     AppBackground {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -78,7 +84,7 @@ fun ScoreScreen(viewModel: ScoreViewModel) {
                         Box(Modifier.width(LABEL_COLUMN_WIDTH).height(NAME_ROW_HEIGHT))
                         scores.forEachIndexed { index, _ ->
                             Box(
-                                modifier = Modifier.width(LABEL_COLUMN_WIDTH).height(SCORE_ROW_HEIGHT),
+                                modifier = Modifier.width(LABEL_COLUMN_WIDTH).height(scoreRowHeight),
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 Text("Manche ${index + 1}")
@@ -125,15 +131,14 @@ fun ScoreScreen(viewModel: ScoreViewModel) {
                             // Une cellule de saisie par manche
                             scores.forEachIndexed { roundIndex, round ->
                                 Box(
-                                    modifier = Modifier.width(PLAYER_COLUMN_WIDTH).height(SCORE_ROW_HEIGHT),
+                                    modifier = Modifier.width(PLAYER_COLUMN_WIDTH).height(scoreRowHeight),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     ScoreCell(
-                                        value = round.getOrNull(playerIndex),
+                                        cell = round[playerIndex],
                                         allowNegative = viewModel.gameRules.allowNegativeScores,
-                                        onValueChange = { newValue ->
-                                            viewModel.updateScore(roundIndex, playerIndex, newValue)
-                                        }
+                                        multipliers = multipliers,
+                                        onChanged = { viewModel.notifyCellChanged(roundIndex) }
                                     )
                                 }
                             }
@@ -159,38 +164,71 @@ fun ScoreScreen(viewModel: ScoreViewModel) {
     }
 }
 
-/** Champ de saisie numérique pour une case du tableau. */
+/**
+ * Champ de saisie numérique pour une case du tableau : bouton +/− pour le signe
+ * (si les scores négatifs sont autorisés), et sélecteur de règle de multiplication
+ * au-dessus du champ (si le jeu en a défini plusieurs).
+ */
 @Composable
 private fun ScoreCell(
-    value: Int?,
+    cell: CellState,
     allowNegative: Boolean,
-    onValueChange: (Int?) -> Unit
+    multipliers: List<ScoreMultiplier>,
+    onChanged: () -> Unit
 ) {
-    var text by remember(value) { mutableStateOf(value?.toString() ?: "") }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (multipliers.size > 1) {
+            var expanded by remember { mutableStateOf(false) }
+            val current = multipliers.find { it.id == cell.multiplierId } ?: multipliers.first()
+            Box {
+                Text(
+                    text = "${current.label} ×${current.factor}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clickable { expanded = true }
+                        .padding(vertical = 2.dp)
+                )
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    multipliers.forEach { multiplier ->
+                        DropdownMenuItem(
+                            text = { Text("${multiplier.label} ×${multiplier.factor}") },
+                            onClick = {
+                                cell.multiplierId = multiplier.id
+                                expanded = false
+                                onChanged()
+                            }
+                        )
+                    }
+                }
+            }
+        }
 
-    OutlinedTextField(
-        value = text,
-        onValueChange = { newText ->
-            val sanitized = sanitizeScoreInput(newText, allowNegative)
-            text = sanitized
-            onValueChange(sanitized.toIntOrNull())
-        },
-        modifier = Modifier.fillMaxWidth().padding(4.dp),
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = if (allowNegative) KeyboardType.NumberPassword else KeyboardType.Number
+        OutlinedTextField(
+            value = cell.baseValue?.toString() ?: "",
+            onValueChange = { newText ->
+                cell.baseValue = newText.filter { it.isDigit() }.toIntOrNull()
+                onChanged()
+            },
+            leadingIcon = if (allowNegative) {
+                {
+                    Text(
+                        text = if (cell.isNegative) "−" else "+",
+                        fontWeight = FontWeight.Bold,
+                        color = if (cell.isNegative) Color(0xFFD32F2F) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clickable {
+                                cell.isNegative = !cell.isNegative
+                                onChanged()
+                            }
+                            .padding(horizontal = 6.dp)
+                    )
+                }
+            } else null,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
-    )
-}
-
-/**
- * Ne garde que les chiffres, plus un éventuel signe moins en première position
- * si [allowNegative] est vrai (ex: "-3"). Le clavier "NumberPassword" est utilisé
- * plutôt que "Number" car ce dernier n'affiche pas toujours la touche "-" sur Android.
- */
-private fun sanitizeScoreInput(raw: String, allowNegative: Boolean): String {
-    if (!allowNegative) return raw.filter { it.isDigit() }
-    val isNegative = raw.trim().startsWith("-")
-    val digits = raw.filter { it.isDigit() }
-    return if (isNegative) "-$digits" else digits
+    }
 }

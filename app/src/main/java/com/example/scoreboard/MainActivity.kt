@@ -44,6 +44,13 @@ fun ScoreApp() {
     // Noms saisis à l'étape 1, en attente d'être associés à un jeu à l'étape 2.
     var pendingPlayerNames by remember { mutableStateOf(listOf<String>()) }
 
+    // Route vers l'écran de score adapté au mode du jeu choisi.
+    fun scoreRouteFor(rules: GameRules): String = when (rules.scoreMode) {
+        ScoreMode.TABLE -> "score"
+        ScoreMode.COUNTER -> "counter"
+        ScoreMode.VARIABLE_TEAMS -> "teamRounds"
+    }
+
     NavHost(navController = navController, startDestination = "setup") {
         composable("setup") {
             SetupScreen(
@@ -58,7 +65,7 @@ fun ScoreApp() {
                 repository = gameRepository,
                 onGameChosen = { rules ->
                     viewModel.initGame(pendingPlayerNames, rules)
-                    navController.navigate("score")
+                    navController.navigate(scoreRouteFor(rules))
                 },
                 onCreateNewGame = {
                     navController.navigate("createGame")
@@ -70,7 +77,7 @@ fun ScoreApp() {
                 repository = gameRepository,
                 onGameCreated = { rules ->
                     viewModel.initGame(pendingPlayerNames, rules)
-                    navController.navigate("score") {
+                    navController.navigate(scoreRouteFor(rules)) {
                         popUpTo("chooseGame") { inclusive = true }
                     }
                 }
@@ -78,6 +85,21 @@ fun ScoreApp() {
         }
         composable("score") {
             ScoreScreen(viewModel = viewModel)
+        }
+        composable("counter") {
+            CounterScreen(viewModel = viewModel)
+        }
+        composable("teamRounds") {
+            TeamRoundsScreen(
+                viewModel = viewModel,
+                onAddRound = { navController.navigate("newTeamRound") }
+            )
+        }
+        composable("newTeamRound") {
+            NewTeamRoundScreen(
+                viewModel = viewModel,
+                onDone = { navController.popBackStack() }
+            )
         }
     }
 }
