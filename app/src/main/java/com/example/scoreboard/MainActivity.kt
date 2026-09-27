@@ -44,6 +44,7 @@ fun ScoreApp() {
     val viewModel: ScoreViewModel = viewModel()
     // Vit au même niveau que ScoreViewModel pour continuer de tourner sur tous les écrans.
     val timerViewModel: TimerViewModel = viewModel()
+    val tournamentViewModel: TournamentViewModel = viewModel()
 
     val context = LocalContext.current
     val gameRepository = remember { GameRepository(context) }
@@ -69,7 +70,25 @@ fun ScoreApp() {
                     },
                     onOpenJournal = {
                         navController.navigate("journal")
+                    },
+                    onOpenTournament = {
+                        navController.navigate("tournamentSetup")
                     }
+                )
+            }
+            composable("tournamentSetup") {
+                TournamentSetupScreen(
+                    onNext = { names ->
+                        tournamentViewModel.startTournament(names)
+                        navController.navigate("tournamentBracket")
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("tournamentBracket") {
+                TournamentBracketScreen(
+                    viewModel = tournamentViewModel,
+                    onBack = { navController.popBackStack("setup", inclusive = false) }
                 )
             }
             composable("journal") {

@@ -19,21 +19,40 @@ enum class EndConditionType {
     NONE,
     /** La partie se termine après un nombre de manches donné. */
     ROUND_COUNT,
-    /** La partie se termine dès qu'un joueur atteint (ou dépasse) un score donné. */
+    /** La partie se termine dès qu'un joueur atteint un score seuil, dans un sens ou l'autre. */
     SCORE_THRESHOLD
+}
+
+/** Sens dans lequel un score doit franchir le seuil pour déclencher la fin de partie. */
+enum class ThresholdDirection {
+    /** La partie s'arrête dès qu'un score atteint ou dépasse le seuil (ex : Belote, Rami). */
+    ABOVE,
+    /** La partie s'arrête dès qu'un score atteint ou descend sous le seuil (cas plus rare). */
+    BELOW
 }
 
 /**
  * Condition de fin de partie.
  *
  * @param roundCount utilisé si [type] == ROUND_COUNT : nombre de manches jouées avant la fin.
- * @param scoreThreshold utilisé si [type] == SCORE_THRESHOLD : score qui déclenche la fin
- *   dès qu'un joueur l'atteint ou le dépasse.
+ * @param scoreThreshold utilisé si [type] == SCORE_THRESHOLD : score qui déclenche la fin.
+ * @param thresholdDirection sens dans lequel le seuil doit être franchi (utilisé si
+ *   [type] == SCORE_THRESHOLD). Par défaut ABOVE, pour ne rien changer au comportement existant.
+ * @param stopImmediately si vrai (par défaut), la partie s'arrête dès que le seuil est franchi,
+ *   même en plein milieu d'une manche. Si faux, on termine la manche en cours (pour que tous
+ *   les joueurs aient joué le même nombre de tours) avant de considérer la partie terminée.
+ *   Utilisé si [type] == SCORE_THRESHOLD.
+ * @param tieBreakOnEqualLeaders si vrai, une manche supplémentaire est jouée si plusieurs
+ *   joueurs sont à égalité en tête au moment où la partie devrait s'arrêter. Utilisé si
+ *   [type] == SCORE_THRESHOLD.
  */
 data class EndCondition(
     val type: EndConditionType = EndConditionType.NONE,
     val roundCount: Int? = null,
-    val scoreThreshold: Int? = null
+    val scoreThreshold: Int? = null,
+    val thresholdDirection: ThresholdDirection = ThresholdDirection.ABOVE,
+    val stopImmediately: Boolean = true,
+    val tieBreakOnEqualLeaders: Boolean = false
 )
 
 /**
@@ -91,6 +110,9 @@ data class GameRules(
         endConditionObj.put("type", endCondition.type.name)
         endCondition.roundCount?.let { endConditionObj.put("roundCount", it) }
         endCondition.scoreThreshold?.let { endConditionObj.put("scoreThreshold", it) }
+        endConditionObj.put("thresholdDirection", endCondition.thresholdDirection.name)
+        endConditionObj.put("stopImmediately", endCondition.stopImmediately)
+        endConditionObj.put("tieBreakOnEqualLeaders", endCondition.tieBreakOnEqualLeaders)
         obj.put("endCondition", endConditionObj)
 
         return obj
@@ -139,7 +161,16 @@ data class GameRules(
                     } else null,
                     scoreThreshold = if (endConditionJson.has("scoreThreshold") && !endConditionJson.isNull("scoreThreshold")) {
                         endConditionJson.getInt("scoreThreshold")
-                    } else null
+                    } else null,
+                    thresholdDirection = try {
+                        ThresholdDirection.valueOf(
+                            endConditionJson.optString("thresholdDirection", ThresholdDirection.ABOVE.name)
+                        )
+                    } catch (e: IllegalArgumentException) {
+                        ThresholdDirection.ABOVE
+                    },
+                    stopImmediately = endConditionJson.optBoolean("stopImmediately", true),
+                    tieBreakOnEqualLeaders = endConditionJson.optBoolean("tieBreakOnEqualLeaders", false)
                 )
             }
 

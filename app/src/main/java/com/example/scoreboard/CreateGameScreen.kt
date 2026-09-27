@@ -53,6 +53,9 @@ fun CreateGameScreen(
     var ruleDrafts by remember { mutableStateOf(listOf<RuleDraft>()) }
     var endConditionType by remember { mutableStateOf(EndConditionType.NONE) }
     var endValueText by remember { mutableStateOf("") }
+    var thresholdDirection by remember { mutableStateOf(ThresholdDirection.ABOVE) }
+    var stopImmediately by remember { mutableStateOf(true) }
+    var tieBreakOnEqualLeaders by remember { mutableStateOf(false) }
 
     AppBackground {
         Column(
@@ -219,13 +222,54 @@ fun CreateGameScreen(
                                         if (endConditionType == EndConditionType.ROUND_COUNT) {
                                             "Nombre de manches"
                                         } else {
-                                            "Score à atteindre"
+                                            "Score seuil"
                                         }
                                     )
                                 },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth()
                             )
+                        }
+
+                        if (endConditionType == EndConditionType.SCORE_THRESHOLD) {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("Sens du seuil", style = MaterialTheme.typography.bodySmall)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilterChip(
+                                        selected = thresholdDirection == ThresholdDirection.ABOVE,
+                                        onClick = { thresholdDirection = ThresholdDirection.ABOVE },
+                                        label = { Text("Le premier à dépasser") }
+                                    )
+                                    FilterChip(
+                                        selected = thresholdDirection == ThresholdDirection.BELOW,
+                                        onClick = { thresholdDirection = ThresholdDirection.BELOW },
+                                        label = { Text("Le premier à passer sous") }
+                                    )
+                                }
+
+                                if (scoreMode == ScoreMode.TABLE) {
+                                    Text("Moment de l'arrêt", style = MaterialTheme.typography.bodySmall)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        FilterChip(
+                                            selected = stopImmediately,
+                                            onClick = { stopImmediately = true },
+                                            label = { Text("Dès le seuil franchi") }
+                                        )
+                                        FilterChip(
+                                            selected = !stopImmediately,
+                                            onClick = { stopImmediately = false },
+                                            label = { Text("Fin de la manche en cours") }
+                                        )
+                                    }
+                                }
+
+                                SettingRow(
+                                    title = "Manche décisive si égalité en tête",
+                                    subtitle = "Rejoue une manche si plusieurs joueurs sont à égalité au sommet",
+                                    checked = tieBreakOnEqualLeaders,
+                                    onCheckedChange = { tieBreakOnEqualLeaders = it }
+                                )
+                            }
                         }
                     }
 
@@ -244,7 +288,13 @@ fun CreateGameScreen(
                             val endCondition = when (endConditionType) {
                                 EndConditionType.NONE -> EndCondition()
                                 EndConditionType.ROUND_COUNT -> EndCondition(type = EndConditionType.ROUND_COUNT, roundCount = endValue)
-                                EndConditionType.SCORE_THRESHOLD -> EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = endValue)
+                                EndConditionType.SCORE_THRESHOLD -> EndCondition(
+                                    type = EndConditionType.SCORE_THRESHOLD,
+                                    scoreThreshold = endValue,
+                                    thresholdDirection = thresholdDirection,
+                                    stopImmediately = stopImmediately,
+                                    tieBreakOnEqualLeaders = tieBreakOnEqualLeaders
+                                )
                             }
                             val rules = GameRules(
                                 id = repository.newId(),

@@ -266,17 +266,57 @@ class ScoreViewModel : ViewModel() {
     /** Vrai si la condition de fin de partie définie par les règles du jeu est atteinte. */
     fun isGameOver(): Boolean {
         val condition = gameRules.endCondition
-        return when (condition.type) {
+        val rawStop = when (condition.type) {
             EndConditionType.NONE -> false
             EndConditionType.ROUND_COUNT -> {
                 val limit = condition.roundCount ?: return false
                 roundsPlayed() >= limit
             }
             EndConditionType.SCORE_THRESHOLD -> {
-                val threshold = condition.scoreThreshold ?: return false
-                players.indices.any { totalFor(it) >= threshold }
+                if (!thresholdReached()) {
+                    false
+                } else if (condition.stopImmediately || gameRules.scoreMode != ScoreMode.TABLE) {
+                    // Hors mode TABLE (pas de notion de "manche en cours" à terminer), ou si
+                    // demandé explicitement, on s'arrête dès que le seuil est franchi.
+                    true
+                } else {
+                    // On attend que la manche en cours soit complète (tous les joueurs ont
+                    // saisi un score) avant de considérer la partie terminée.
+                    activeRoundComplete()
+                }
             }
         }
+        if (!rawStop) return false
+        // Manche décisive : si plusieurs joueurs sont à égalité en tête, on ne s'arrête pas.
+        if (condition.type == EndConditionType.SCORE_THRESHOLD && condition.tieBreakOnEqualLeaders && hasTiedLeaders()) {
+            return false
+        }
+        return true
+    }
+
+    /** Vrai si le seuil de score des règles est franchi par au moins un joueur, dans le sens configuré. */
+    private fun thresholdReached(): Boolean {
+        val condition = gameRules.endCondition
+        val threshold = condition.scoreThreshold ?: return false
+        return when (condition.thresholdDirection) {
+            ThresholdDirection.ABOVE -> players.indices.any { totalFor(it) >= threshold }
+            ThresholdDirection.BELOW -> players.indices.any { totalFor(it) <= threshold }
+        }
+    }
+
+    /** Vrai si la dernière manche entamée (mode TABLE) a été remplie par tous les joueurs. */
+    private fun activeRoundComplete(): Boolean {
+        val activeIndex = _scores.indexOfLast { round -> round.any { it.baseValue != null } }
+        if (activeIndex == -1) return false
+        return _scores[activeIndex].all { it.baseValue != null }
+    }
+
+    /** Vrai si plusieurs joueurs sont à égalité à la meilleure place du classement actuel. */
+    private fun hasTiedLeaders(): Boolean {
+        if (players.isEmpty()) return false
+        val totals = players.indices.map { totalFor(it) }
+        val best = if (gameRules.lowestWins) totals.min() else totals.max()
+        return totals.count { it == best } > 1
     }
 
     /** Index du joueur en tête si la partie est terminée, sinon null. */

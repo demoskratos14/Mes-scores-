@@ -14,7 +14,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,18 +29,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun SetupScreen(
+fun TournamentSetupScreen(
     onNext: (List<String>) -> Unit,
-    onOpenJournal: () -> Unit,
-    onOpenTournament: () -> Unit
+    onBack: () -> Unit
 ) {
-    var playerCountText by remember { mutableStateOf("2") }
-    val playerCount = (playerCountText.toIntOrNull() ?: 2).coerceIn(1, 12)
+    var playerCountText by remember { mutableStateOf("4") }
+    val playerCount = (playerCountText.toIntOrNull() ?: 4).coerceIn(2, 32)
 
     var names by remember { mutableStateOf(List(playerCount) { "" }) }
 
-    // Ajuste la taille de la liste de noms quand le nombre de joueurs change,
-    // en conservant les noms déjà saisis.
     LaunchedEffect(playerCount) {
         names = List(playerCount) { i -> names.getOrElse(i) { "" } }
     }
@@ -55,24 +51,25 @@ fun SetupScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White.copy(alpha = 0.93f)
-                ),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.93f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    Text("Nouveau championnat", style = MaterialTheme.typography.headlineMedium)
                     Text(
-                        text = "Nouvelle partie",
-                        style = MaterialTheme.typography.headlineMedium
+                        "Élimination directe : demi-finales, finale et petite finale sont " +
+                            "générées automatiquement.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     OutlinedTextField(
                         value = playerCountText,
                         onValueChange = { input -> playerCountText = input.filter { it.isDigit() } },
-                        label = { Text("Nombre de joueurs") },
+                        label = { Text("Nombre de participants") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -90,7 +87,7 @@ fun SetupScreen(
                                 onValueChange = { newName ->
                                     names = names.toMutableList().also { it[index] = newName }
                                 },
-                                label = { Text("Nom du joueur ${index + 1}") },
+                                label = { Text("Participant ${index + 1}") },
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -98,26 +95,16 @@ fun SetupScreen(
 
                     Button(
                         onClick = {
-                            val finalNames = names.mapIndexed { i, n -> n.ifBlank { "Joueur ${i + 1}" } }
+                            val finalNames = names.mapIndexed { i, n -> n.ifBlank { "Participant ${i + 1}" } }
                             onNext(finalNames)
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Continuer")
+                        Text("Tirer au sort et commencer")
                     }
 
-                    OutlinedButton(
-                        onClick = onOpenTournament,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Nouveau championnat")
-                    }
-
-                    TextButton(
-                        onClick = onOpenJournal,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Journal des parties")
+                    TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+                        Text("← Retour")
                     }
                 }
             }
