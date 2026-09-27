@@ -28,8 +28,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun SetupScreen(
-    viewModel: ScoreViewModel,
-    onStart: () -> Unit
+    onNext: (List<String>) -> Unit
 ) {
     var playerCountText by remember { mutableStateOf("2") }
     val playerCount = (playerCountText.toIntOrNull() ?: 2).coerceIn(1, 12)
@@ -94,12 +93,11 @@ fun SetupScreen(
                     Button(
                         onClick = {
                             val finalNames = names.mapIndexed { i, n -> n.ifBlank { "Joueur ${i + 1}" } }
-                            viewModel.initGame(finalNames)
-                            onStart()
+                            onNext(finalNames)
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Commencer la partie")
+                        Text("Continuer")
                     }
                 }
             }

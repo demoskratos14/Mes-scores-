@@ -20,6 +20,9 @@ class ScoreViewModel : ViewModel() {
     var players by mutableStateOf<List<String>>(emptyList())
         private set
 
+    var gameRules by mutableStateOf(GameRules(id = "default", name = "Jeu classique"))
+        private set
+
     private val _scores = mutableStateListOf<SnapshotStateList<Int?>>()
     val scores: List<SnapshotStateList<Int?>> get() = _scores
 
@@ -27,9 +30,10 @@ class ScoreViewModel : ViewModel() {
         private const val INITIAL_ROUNDS = 5
     }
 
-    /** Démarre une nouvelle partie avec la liste de noms fournie. */
-    fun initGame(playerNames: List<String>) {
+    /** Démarre une nouvelle partie avec la liste de noms et les règles de score fournies. */
+    fun initGame(playerNames: List<String>, rules: GameRules) {
         players = playerNames
+        gameRules = rules
         _scores.clear()
         repeat(INITIAL_ROUNDS) { addRound() }
     }
@@ -57,8 +61,13 @@ class ScoreViewModel : ViewModel() {
     /** Total cumulé d'un joueur sur toutes les manches. */
     fun totalFor(player: Int): Int = _scores.sumOf { it.getOrNull(player) ?: 0 }
 
-    /** Index des joueurs triés du meilleur score au moins bon. */
-    fun rankingOrder(): List<Int> = players.indices.sortedByDescending { totalFor(it) }
+    /** Index des joueurs triés du meilleur score au moins bon, selon les règles du jeu. */
+    fun rankingOrder(): List<Int> =
+        if (gameRules.lowestWins) {
+            players.indices.sortedBy { totalFor(it) }
+        } else {
+            players.indices.sortedByDescending { totalFor(it) }
+        }
 
     /** Rang (1 = premier) d'un joueur donné. */
     fun rankOf(player: Int): Int = rankingOrder().indexOf(player) + 1

@@ -51,7 +51,12 @@ fun ScoreScreen(viewModel: ScoreViewModel) {
             Text(
                 text = "Feuille de scores",
                 style = MaterialTheme.typography.headlineSmall,
-                color = Color.White,
+                color = Color.White
+            )
+            Text(
+                text = viewModel.gameRules.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
@@ -125,6 +130,7 @@ fun ScoreScreen(viewModel: ScoreViewModel) {
                                 ) {
                                     ScoreCell(
                                         value = round.getOrNull(playerIndex),
+                                        allowNegative = viewModel.gameRules.allowNegativeScores,
                                         onValueChange = { newValue ->
                                             viewModel.updateScore(roundIndex, playerIndex, newValue)
                                         }
@@ -157,6 +163,7 @@ fun ScoreScreen(viewModel: ScoreViewModel) {
 @Composable
 private fun ScoreCell(
     value: Int?,
+    allowNegative: Boolean,
     onValueChange: (Int?) -> Unit
 ) {
     var text by remember(value) { mutableStateOf(value?.toString() ?: "") }
@@ -164,12 +171,26 @@ private fun ScoreCell(
     OutlinedTextField(
         value = text,
         onValueChange = { newText ->
-            val digitsOnly = newText.filter { it.isDigit() }
-            text = digitsOnly
-            onValueChange(digitsOnly.toIntOrNull())
+            val sanitized = sanitizeScoreInput(newText, allowNegative)
+            text = sanitized
+            onValueChange(sanitized.toIntOrNull())
         },
         modifier = Modifier.fillMaxWidth().padding(4.dp),
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (allowNegative) KeyboardType.NumberPassword else KeyboardType.Number
+        )
     )
+}
+
+/**
+ * Ne garde que les chiffres, plus un éventuel signe moins en première position
+ * si [allowNegative] est vrai (ex: "-3"). Le clavier "NumberPassword" est utilisé
+ * plutôt que "Number" car ce dernier n'affiche pas toujours la touche "-" sur Android.
+ */
+private fun sanitizeScoreInput(raw: String, allowNegative: Boolean): String {
+    if (!allowNegative) return raw.filter { it.isDigit() }
+    val isNegative = raw.trim().startsWith("-")
+    val digits = raw.filter { it.isDigit() }
+    return if (isNegative) "-$digits" else digits
 }
