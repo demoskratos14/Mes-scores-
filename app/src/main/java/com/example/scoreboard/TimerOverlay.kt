@@ -1,5 +1,10 @@
 package com.example.scoreboard
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,8 +42,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-private fun formatMillis(ms: Long): String {
-    val totalSeconds = (ms / 1000).coerceAtLeast(0)
+private fun formatMillis(ms: Long, roundUp: Boolean = false): String {
+    // Un minuteur affiche la seconde entamée (00:01 jusqu'à zéro), un chronomètre les secondes écoulées.
+    val totalSeconds = (if (roundUp) (ms + 999) / 1000 else ms / 1000).coerceAtLeast(0)
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "%02d:%02d".format(minutes, seconds)
@@ -58,18 +64,34 @@ fun TimerOverlay(viewModel: TimerViewModel) {
         viewModel.countdownRemainingMillis
     }
 
+    // Quand le minuteur est terminé, le badge clignote en rouge jusqu'à la réinitialisation.
+    val blink = if (viewModel.justFinished) {
+        val transition = rememberInfiniteTransition(label = "timerBlink")
+        transition.animateFloat(
+            initialValue = 1f,
+            targetValue = 0.35f,
+            animationSpec = infiniteRepeatable(tween(500), RepeatMode.Reverse),
+            label = "timerBlinkAlpha"
+        ).value
+    } else {
+        1f
+    }
+    val badgeColor = when {
+        viewModel.justFinished -> Color(0xFFD32F2F).copy(alpha = blink)
+        viewModel.isRunning -> Color.Black.copy(alpha = 0.8f)
+        else -> Color.Black.copy(alpha = 0.55f)
+    }
+
     Box(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         contentAlignment = Alignment.BottomEnd
     ) {
         Card(
-            colors = CardDefaults.cardColors(
-                containerColor = if (viewModel.isRunning) Color.Black.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.55f)
-            ),
+            colors = CardDefaults.cardColors(containerColor = badgeColor),
             modifier = Modifier.clickable { showDialog = true }
         ) {
             Text(
-                text = formatMillis(displayMillis),
+                text = formatMillis(displayMillis, roundUp = viewModel.mode == TimerMode.COUNTDOWN),
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium,
@@ -128,7 +150,7 @@ private fun TimerDialog(viewModel: TimerViewModel, onDismiss: () -> Unit) {
                 }
 
                 Text(
-                    text = formatMillis(displayMillis),
+                    text = formatMillis(displayMillis, roundUp = viewModel.mode == TimerMode.COUNTDOWN),
                     style = MaterialTheme.typography.displayMedium,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,

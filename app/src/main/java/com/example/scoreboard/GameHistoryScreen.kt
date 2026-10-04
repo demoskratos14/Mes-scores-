@@ -142,10 +142,26 @@ private fun GameHistoryRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            val totals = game.totals()
+            val order = if (game.gameRules.lowestWins) {
+                game.players.indices.sortedBy { totals[it] }
+            } else {
+                game.players.indices.sortedByDescending { totals[it] }
+            }
             Text(
-                text = game.players.joinToString(", "),
+                text = order.joinToString(" · ") { "${game.players[it]} ${totals[it]}" },
                 style = MaterialTheme.typography.bodyMedium
             )
+            if (game.isFinished && totals.distinct().size > 1) {
+                val best = if (game.gameRules.lowestWins) totals.min() else totals.max()
+                val leaders = game.players.indices.filter { totals[it] == best }
+                Text(
+                    text = (if (leaders.size > 1) "Vainqueurs : " else "Vainqueur : ") +
+                        leaders.joinToString(" et ") { game.players[it] },
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                 Button(onClick = onResume) {
                     Text(if (game.isFinished) "Revoir" else "Reprendre")

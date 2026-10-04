@@ -75,11 +75,12 @@ fun ScoreScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryReposit
     val players = viewModel.players
     val playerColors = viewModel.playerColors
     val scores = viewModel.scores
-    val rankingOrder = viewModel.rankingOrder()
     val multipliers = viewModel.gameRules.multipliers
     val hasCustomMultipliers = multipliers.size > 1
     // Un peu plus de hauteur par case quand le sélecteur de règle est affiché.
     val scoreRowHeight = if (hasCustomMultipliers) 92.dp else 72.dp
+
+    KeepScreenOn()
 
     // Nom complet affiché en popup quand une case de nom tronquée est cliquée.
     var expandedNameIndex by remember { mutableStateOf<Int?>(null) }
@@ -129,13 +130,16 @@ fun ScoreScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryReposit
             Spacer(modifier = Modifier.height(12.dp))
 
             if (viewModel.isGameOver()) {
-                val winner = viewModel.winner()
+                val winners = viewModel.winners()
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF59D)),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 ) {
                     Text(
-                        text = "Partie terminée" + (winner?.let { " · ${players[it]} gagne !" } ?: ""),
+                        text = "Partie terminée" + if (winners.isEmpty()) "" else {
+                            " · ${winners.joinToString(" et ") { players[it] }} " +
+                                (if (winners.size > 1) "gagnent !" else "gagne !")
+                        },
                         modifier = Modifier.padding(12.dp),
                         fontWeight = FontWeight.Bold
                     )
@@ -165,6 +169,7 @@ fun ScoreScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryReposit
                             }
                             players.forEachIndexed { playerIndex, name ->
                                 val rank = viewModel.rankOf(playerIndex)
+                                val isLeader = viewModel.isLeader(playerIndex)
                                 val color = playerColors.getOrElse(playerIndex) { Color.Gray }
                                 Column {
                                     Box(
@@ -172,7 +177,7 @@ fun ScoreScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryReposit
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            if (rank == 1 && rankingOrder.isNotEmpty()) {
+                                            if (isLeader) {
                                                 Icon(
                                                     imageVector = Icons.Filled.EmojiEvents,
                                                     contentDescription = "Premier",

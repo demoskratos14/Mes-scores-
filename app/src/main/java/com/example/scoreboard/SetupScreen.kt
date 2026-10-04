@@ -1,5 +1,6 @@
 package com.example.scoreboard
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,11 +24,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import org.json.JSONArray
 
 @Composable
 fun SetupScreen(
@@ -35,10 +40,20 @@ fun SetupScreen(
     onOpenJournal: () -> Unit,
     onOpenTournament: () -> Unit
 ) {
-    var playerCountText by remember { mutableStateOf("2") }
+    val context = LocalContext.current
+    // Noms de la dernière partie lancée, pour ne pas les retaper à chaque fois.
+    val savedNames = remember { loadLastPlayerNames(context) }
+
+    var playerCountText by rememberSaveable {
+        mutableStateOf((savedNames.size.takeIf { it >= 2 } ?: 2).toString())
+    }
     val playerCount = (playerCountText.toIntOrNull() ?: 2).coerceIn(1, 12)
 
-    var names by remember { mutableStateOf(List(playerCount) { "" }) }
+    var names by rememberSaveable(
+        stateSaver = listSaver<List<String>, String>(save = { it }, restore = { it })
+    ) {
+        mutableStateOf(List(playerCount) { i -> savedNames.getOrElse(i) { "" } })
+    }
 
     // Ajuste la taille de la liste de noms quand le nombre de joueurs change,
     // en conservant les noms déjà saisis.
@@ -98,6 +113,7 @@ fun SetupScreen(
 
                     Button(
                         onClick = {
+                            saveLastPlayerNames(context, names)
                             val finalNames = names.mapIndexed { i, n -> n.ifBlank { "Joueur ${i + 1}" } }
                             onNext(finalNames)
                         },
@@ -123,4 +139,27 @@ fun SetupScreen(
             }
         }
     }
+}
+
+private const val SETUP_PREFS = "mes_scores_setup"
+private const val KEY_LAST_NAMES = "last_player_names"
+
+private fun loadLastPlayerNames(context: Context): List<String> = try {
+    val json = context.getSharedPreferences(SETUP_PREFS, Context.MODE_PRIVATE)
+        .getString(KEY_LAST_NAMES, null)
+    if (json == null) {
+        emptyList()
+    } else {
+        val array = JSONArray(json)
+        (0 until array.length()).map { array.getString(it) }
+    }
+} catch (e: Exception) {
+    emptyList()
+}
+
+private fun saveLastPlayerNames(context: Context, names: List<String>) {
+    context.getSharedPreferences(SETUP_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString(KEY_LAST_NAMES, JSONArray(names).toString())
+        .apply()
 }

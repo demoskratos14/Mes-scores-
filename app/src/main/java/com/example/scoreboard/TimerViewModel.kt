@@ -1,5 +1,6 @@
 package com.example.scoreboard
 
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -42,6 +43,15 @@ class TimerViewModel : ViewModel() {
 
     private var tickJob: Job? = null
 
+    /** Appelée une fois quand le minuteur atteint zéro (vibration, son…). */
+    var onFinished: (() -> Unit)? = null
+
+    // Le temps est calculé à partir de l'horloge du téléphone et non en ajoutant 1 s à chaque
+    // tour de boucle, pour ne pas prendre de retard avec le temps.
+    private var runStartRealtime = 0L
+    private var baseElapsed = 0L
+    private var baseRemaining = 0L
+
     fun selectMode(newMode: TimerMode) {
         if (isRunning) return
         mode = newMode
@@ -61,24 +71,32 @@ class TimerViewModel : ViewModel() {
         }
         isRunning = true
         justFinished = false
+        runStartRealtime = SystemClock.elapsedRealtime()
+        baseElapsed = elapsedMillis
+        baseRemaining = countdownRemainingMillis
         tickJob = viewModelScope.launch {
             while (isRunning) {
-                delay(1000)
-                when (mode) {
-                    TimerMode.STOPWATCH -> elapsedMillis += 1000
-                    TimerMode.COUNTDOWN -> {
-                        countdownRemainingMillis = (countdownRemainingMillis - 1000).coerceAtLeast(0)
-                        if (countdownRemainingMillis == 0L) {
-                            isRunning = false
-                            justFinished = true
-                        }
-                    }
+                delay(TICK_MILLIS)
+                syncFromClock()
+                if (mode == TimerMode.COUNTDOWN && countdownRemainingMillis == 0L) {
+                    isRunning = false
+                    justFinished = true
+                    onFinished?.invoke()
                 }
             }
         }
     }
 
+    private fun syncFromClock() {
+        val spent = SystemClock.elapsedRealtime() - runStartRealtime
+        when (mode) {
+            TimerMode.STOPWATCH -> elapsedMillis = baseElapsed + spent
+            TimerMode.COUNTDOWN -> countdownRemainingMillis = (baseRemaining - spent).coerceAtLeast(0)
+        }
+    }
+
     fun pause() {
+        if (isRunning) syncFromClock()
         isRunning = false
         tickJob?.cancel()
     }
@@ -88,6 +106,10 @@ class TimerViewModel : ViewModel() {
         elapsedMillis = 0L
         countdownRemainingMillis = countdownDurationMillis
         justFinished = false
+    }
+
+    private companion object {
+        const val TICK_MILLIS = 200L
     }
 
     override fun onCleared() {

@@ -32,7 +32,7 @@ class GameRepository(context: Context) {
             lowestWins = true,
             allowNegativeScores = true,
             scoreMode = ScoreMode.TABLE,
-            endCondition = EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = 100)
+            endCondition = EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = 100, stopImmediately = false)
         ),
         GameRules(
             id = "builtin_tarot",
@@ -55,7 +55,7 @@ class GameRepository(context: Context) {
             lowestWins = false,
             allowNegativeScores = false,
             scoreMode = ScoreMode.TABLE,
-            endCondition = EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = 501)
+            endCondition = EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = 501, stopImmediately = false)
         ),
         GameRules(
             id = "builtin_rami",
@@ -63,7 +63,7 @@ class GameRepository(context: Context) {
             lowestWins = true,
             allowNegativeScores = false,
             scoreMode = ScoreMode.TABLE,
-            endCondition = EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = 500)
+            endCondition = EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = 500, stopImmediately = false)
         ),
         GameRules(
             id = "builtin_uno",

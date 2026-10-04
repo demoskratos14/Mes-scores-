@@ -22,7 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -89,16 +89,21 @@ fun NewTarotRoundScreen(
     val players = viewModel.players
     val multipliers = viewModel.gameRules.multipliers
 
-    var takerIndex by remember { mutableStateOf<Int?>(null) }
-    // Index dans la liste des "autres joueurs" ; null = pas de partenaire (preneur seul).
-    var partnerIndex by remember { mutableStateOf<Int?>(null) }
-    var multiplierIndex by remember { mutableStateOf(0) }
-    var bouts by remember { mutableStateOf(0) }
-    var pointsText by remember { mutableStateOf("") }
-    var petitAuBout by remember { mutableStateOf(0) } // 0 aucun, 1 preneur, 2 défense
-    var handful by remember { mutableStateOf(0) }     // 0 aucune, 1 simple, 2 double, 3 triple
-    var slamAnnounced by remember { mutableStateOf(false) } // chelem annoncé par le preneur
-    var defenseSlam by remember { mutableStateOf(false) }   // la défense a fait tous les plis
+    // Si on corrige une manche existante, les champs démarrent avec sa saisie d'origine.
+    val editIndex = viewModel.editingTeamRoundIndex
+    val editing: TarotRoundInput? = editIndex?.let { viewModel.teamRounds.getOrNull(it)?.tarotInput }
+
+    // rememberSaveable : la saisie survit à une rotation de l'écran.
+    var takerIndex by rememberSaveable { mutableStateOf<Int?>(editing?.taker) }
+    // Index d'un joueur ; null = pas de partenaire (preneur seul).
+    var partnerIndex by rememberSaveable { mutableStateOf<Int?>(editing?.partner) }
+    var multiplierIndex by rememberSaveable { mutableStateOf(editing?.multiplierIndex ?: 0) }
+    var bouts by rememberSaveable { mutableStateOf(editing?.bouts ?: 0) }
+    var pointsText by rememberSaveable { mutableStateOf(editing?.points?.toString() ?: "") }
+    var petitAuBout by rememberSaveable { mutableStateOf(editing?.petitAuBout ?: 0) } // 0 aucun, 1 preneur, 2 défense
+    var handful by rememberSaveable { mutableStateOf(editing?.handful ?: 0) }         // 0 aucune, 1 simple, 2 double, 3 triple
+    var slamAnnounced by rememberSaveable { mutableStateOf(editing?.slamAnnounced ?: false) } // chelem annoncé par le preneur
+    var defenseSlam by rememberSaveable { mutableStateOf(editing?.defenseSlam ?: false) }     // la défense a fait tous les plis
 
     val taker = takerIndex
     val points = pointsText.toIntOrNull()?.takeIf { it in 0..91 }
@@ -163,7 +168,10 @@ fun NewTarotRoundScreen(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text("Nouvelle manche", style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        if (editing != null) "Modifier la manche" else "Nouvelle manche",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
 
                     Text("Preneur", style = MaterialTheme.typography.titleSmall)
                     ChoiceRow(players, takerIndex) { takerIndex = it }
@@ -276,7 +284,9 @@ fun NewTarotRoundScreen(
                     Button(
                         onClick = {
                             val result = deltas ?: return@Button
-                            val attackers = setOfNotNull(taker, partner)
+                            val takerId = taker ?: return@Button
+                            val pointsMade = points ?: return@Button
+                            val attackers = setOfNotNull(takerId, partner)
                             val team = attackers.joinToString(" + ") { players[it] }
                             val label = "$team · ${multiplier.label} · " +
                                 "$bouts bout${if (bouts > 1) "s" else ""} · $points pts " +
@@ -286,18 +296,35 @@ fun NewTarotRoundScreen(
                                     defenseSlamActive -> " · chelem de la défense"
                                     else -> ""
                                 }
-                            viewModel.addDetailedTeamRound(
+                            val round = TeamRound(
                                 teamALabel = label,
                                 teamAPlayers = attackers,
                                 value = perDefender,
+                                tarotInput = TarotRoundInput(
+                                    taker = takerId,
+                                    partner = partner,
+                                    multiplierIndex = multiplierIndex,
+                                    bouts = bouts,
+                                    points = pointsMade,
+                                    petitAuBout = petitAuBout,
+                                    handful = handful,
+                                    slamAnnounced = slamAnnounced,
+                                    defenseSlam = defenseSlam
+                                ),
                                 deltas = result
                             )
+                            if (editIndex != null && editing != null) {
+                                viewModel.replaceTeamRound(editIndex, round)
+                            } else {
+                                viewModel.appendTeamRound(round)
+                            }
+                            viewModel.editingTeamRoundIndex = null
                             onDone()
                         },
                         enabled = canValidate,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Valider la manche")
+                        Text(if (editing != null) "Enregistrer la modification" else "Valider la manche")
                     }
                 }
             }

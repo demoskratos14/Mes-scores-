@@ -35,12 +35,27 @@ data class TeamRound(
     val teamALabel: String,
     val teamAPlayers: Set<Int>,
     val value: Int,
+    /** Saisie d'origine d'une manche de Tarot, conservée pour pouvoir la corriger (voir [TarotRoundInput]). */
+    val tarotInput: TarotRoundInput? = null,
     /**
      * Points exacts gagnés ou perdus par chaque joueur (même index que la liste des joueurs),
      * pour les jeux qui répartissent le score de façon inégale (Tarot). Si null, on applique
      * la règle simple : [value] à l'équipe A et son opposé aux autres joueurs.
      */
     val deltas: List<Int>? = null
+)
+
+/** Saisie brute d'une manche de Tarot (preneur, contrat, points, primes…), pour la modifier plus tard. */
+data class TarotRoundInput(
+    val taker: Int,
+    val partner: Int?,
+    val multiplierIndex: Int,
+    val bouts: Int,
+    val points: Int,
+    val petitAuBout: Int,
+    val handful: Int,
+    val slamAnnounced: Boolean,
+    val defenseSlam: Boolean
 )
 
 /**
@@ -72,6 +87,12 @@ class ScoreViewModel : ViewModel() {
     var currentSaveId: String? by mutableStateOf(null)
         private set
 
+    /** Vrai tant qu'une partie est ouverte (faux avant la première partie et après [closeGame]). */
+    private var gameActive = false
+
+    /** Index de la manche de Tarot en cours de correction, ou null pour une nouvelle manche. */
+    var editingTeamRoundIndex: Int? = null
+
     // --- Mode TABLE ---
     private val _scores = mutableStateListOf<SnapshotStateList<CellState>>()
     val scores: List<SnapshotStateList<CellState>> get() = _scores
@@ -102,6 +123,8 @@ class ScoreViewModel : ViewModel() {
         gameRules = rules
         playerColors = assignColors(playerNames.size)
         currentSaveId = null
+        gameActive = true
+        editingTeamRoundIndex = null
         _scores.clear()
         _counters.clear()
         _teamRounds.clear()
@@ -115,6 +138,8 @@ class ScoreViewModel : ViewModel() {
     /** Restaure une partie précédemment enregistrée dans le journal, telle quelle. */
     fun loadFromSaved(saved: SavedGame) {
         currentSaveId = saved.id
+        gameActive = true
+        editingTeamRoundIndex = null
         players = saved.players
         gameRules = saved.gameRules
         playerColors = if (saved.playerColorsArgb.size == saved.players.size) {
@@ -158,6 +183,21 @@ class ScoreViewModel : ViewModel() {
                 saved.teamRounds?.forEach { _teamRounds.add(it) }
             }
         }
+    }
+
+    /** Vrai si la partie ouverte contient au moins un score saisi (donc qu'il y a quelque chose à perdre). */
+    fun hasProgress(): Boolean {
+        if (!gameActive || players.isEmpty()) return false
+        return when (gameRules.scoreMode) {
+            ScoreMode.TABLE -> _scores.any { round -> round.any { it.baseValue != null } }
+            ScoreMode.COUNTER -> _counters.any { it != 0 }
+            ScoreMode.VARIABLE_TEAMS -> _teamRounds.isNotEmpty()
+        }
+    }
+
+    /** Marque la partie comme abandonnée : elle ne sera plus enregistrée automatiquement. */
+    fun closeGame() {
+        gameActive = false
     }
 
     /** Capture l'état actuel de la partie, prêt à être enregistré dans le journal via [GameHistoryRepository]. */
@@ -235,9 +275,14 @@ class ScoreViewModel : ViewModel() {
         _teamRounds.add(TeamRound(teamALabel, teamAPlayers, value))
     }
 
-    /** Ajoute une manche dont les points de chaque joueur ont déjà été calculés (voir [TeamRound.deltas]). */
-    fun addDetailedTeamRound(teamALabel: String, teamAPlayers: Set<Int>, value: Int, deltas: List<Int>) {
-        _teamRounds.add(TeamRound(teamALabel, teamAPlayers, value, deltas))
+    /** Ajoute une manche déjà entièrement calculée (voir [TeamRound.deltas]). */
+    fun appendTeamRound(round: TeamRound) {
+        _teamRounds.add(round)
+    }
+
+    /** Remplace la manche d'index [index] (correction d'une manche déjà saisie). */
+    fun replaceTeamRound(index: Int, round: TeamRound) {
+        if (index in _teamRounds.indices) _teamRounds[index] = round
     }
 
     fun removeTeamRound(index: Int) {
@@ -267,8 +312,21 @@ class ScoreViewModel : ViewModel() {
             players.indices.sortedByDescending { totalFor(it) }
         }
 
-    /** Rang (1 = premier) d'un joueur donné. */
-    fun rankOf(player: Int): Int = rankingOrder().indexOf(player) + 1
+    /** Rang (1 = premier) d'un joueur donné. Les joueurs à égalité partagent le même rang. */
+    fun rankOf(player: Int): Int {
+        val mine = totalFor(player)
+        val better = players.indices.count { other ->
+            val total = totalFor(other)
+            if (gameRules.lowestWins) total < mine else total > mine
+        }
+        return better + 1
+    }
+
+    /** Vrai si le joueur est en tête (ex æquo compris), sauf si tout le monde est à égalité. */
+    fun isLeader(player: Int): Boolean {
+        val totals = players.indices.map { totalFor(it) }
+        return totals.distinct().size > 1 && rankOf(player) == 1
+    }
 
     /** Nombre de manches réellement jouées (au moins une case remplie), pour TABLE et VARIABLE_TEAMS. */
     fun roundsPlayed(): Int = when (gameRules.scoreMode) {
@@ -334,5 +392,9 @@ class ScoreViewModel : ViewModel() {
     }
 
     /** Index du joueur en tête si la partie est terminée, sinon null. */
-    fun winner(): Int? = if (isGameOver() && players.isNotEmpty()) rankingOrder().firstOrNull() else null
+    fun winner(): Int? = winners().firstOrNull()
+
+    /** Joueurs en tête (plusieurs en cas d'égalité) si la partie est terminée, sinon liste vide. */
+    fun winners(): List<Int> =
+        if (isGameOver() && players.isNotEmpty()) players.indices.filter { rankOf(it) == 1 } else emptyList()
 }

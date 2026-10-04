@@ -74,7 +74,8 @@ private val BUILT_IN_RULES: Map<String, List<RulesSection>> = mapOf(
         RulesSection(
             "Dans l'appli",
             "Saisissez le score de chaque joueur à chaque manche (bouton +/− pour les négatifs). " +
-                "Le classement favorise le total le plus bas et la partie s'arrête à 100 points."
+                "Le classement favorise le total le plus bas. La partie s'arrête à la fin de la manche " +
+                "où un joueur atteint 100 points."
         )
     ),
     "builtin_tarot" to listOf(
@@ -121,7 +122,7 @@ private val BUILT_IN_RULES: Map<String, List<RulesSection>> = mapOf(
                 "le nombre de bouts et les points réalisés, puis cochez les primes éventuelles. " +
                 "À 91 points, le chelem réussi est ajouté automatiquement. " +
                 "L'appli calcule le score de chaque joueur (la somme de la manche est toujours nulle) " +
-                "et l'affiche avant validation."
+                "et l'affiche avant validation. Le crayon de l'historique permet de corriger une manche."
         )
     ),
     "builtin_belote" to listOf(
@@ -151,8 +152,8 @@ private val BUILT_IN_RULES: Map<String, List<RulesSection>> = mapOf(
         ),
         RulesSection(
             "Dans l'appli",
-            "Saisissez les points de chaque manche. La partie s'arrête dès qu'un joueur ou une équipe " +
-                "atteint 501 points."
+            "Saisissez les points de chaque manche. La partie s'arrête à la fin de la manche où " +
+                "un joueur ou une équipe atteint 501 points."
         )
     ),
     "builtin_rami" to listOf(
@@ -180,7 +181,7 @@ private val BUILT_IN_RULES: Map<String, List<RulesSection>> = mapOf(
         RulesSection(
             "Dans l'appli",
             "Saisissez les points de chaque joueur à chaque manche. Le total le plus bas gagne " +
-                "et la partie s'arrête dès qu'un joueur atteint 500 points."
+                "et la partie s'arrête à la fin de la manche où un joueur atteint 500 points."
         )
     ),
     "builtin_uno" to listOf(

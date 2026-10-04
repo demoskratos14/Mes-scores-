@@ -35,6 +35,19 @@ private fun TeamRound.toJson(): JSONObject {
     teamAPlayers.forEach { playersArray.put(it) }
     obj.put("teamAPlayers", playersArray)
     obj.put("value", value)
+    tarotInput?.let { input ->
+        val inputObj = JSONObject()
+        inputObj.put("taker", input.taker)
+        input.partner?.let { inputObj.put("partner", it) }
+        inputObj.put("multiplierIndex", input.multiplierIndex)
+        inputObj.put("bouts", input.bouts)
+        inputObj.put("points", input.points)
+        inputObj.put("petitAuBout", input.petitAuBout)
+        inputObj.put("handful", input.handful)
+        inputObj.put("slamAnnounced", input.slamAnnounced)
+        inputObj.put("defenseSlam", input.defenseSlam)
+        obj.put("tarotInput", inputObj)
+    }
     deltas?.let { list ->
         val deltasArray = JSONArray()
         list.forEach { deltasArray.put(it) }
@@ -54,6 +67,19 @@ private fun teamRoundFromJson(obj: JSONObject): TeamRound {
         teamALabel = obj.getString("teamALabel"),
         teamAPlayers = playersSet,
         value = obj.getInt("value"),
+        tarotInput = obj.optJSONObject("tarotInput")?.let { input ->
+            TarotRoundInput(
+                taker = input.getInt("taker"),
+                partner = if (input.has("partner")) input.getInt("partner") else null,
+                multiplierIndex = input.getInt("multiplierIndex"),
+                bouts = input.getInt("bouts"),
+                points = input.getInt("points"),
+                petitAuBout = input.getInt("petitAuBout"),
+                handful = input.getInt("handful"),
+                slamAnnounced = input.getBoolean("slamAnnounced"),
+                defenseSlam = input.getBoolean("defenseSlam")
+            )
+        },
         deltas = obj.optJSONArray("deltas")?.let { array ->
             (0 until array.length()).map { array.getInt(it) }
         }
@@ -78,6 +104,31 @@ data class SavedGame(
     val teamRounds: List<TeamRound>? = null,
     val isFinished: Boolean
 ) {
+    /** Total de chaque joueur au moment de l'enregistrement (même index que [players]). */
+    fun totals(): List<Int> = when (gameRules.scoreMode) {
+        ScoreMode.TABLE -> players.indices.map { p ->
+            cellSnapshots.orEmpty().fold(0) { acc, round ->
+                val cell = round.getOrNull(p)
+                val base = cell?.baseValue
+                if (cell == null || base == null) {
+                    acc
+                } else {
+                    val rule = gameRules.multipliers.find { it.id == cell.multiplierId }
+                        ?: GameRules.NORMAL_MULTIPLIER
+                    val magnitude = base * rule.factor + rule.bonus
+                    acc + if (cell.isNegative) -magnitude else magnitude
+                }
+            }
+        }
+        ScoreMode.COUNTER -> players.indices.map { counters?.getOrNull(it) ?: 0 }
+        ScoreMode.VARIABLE_TEAMS -> players.indices.map { p ->
+            teamRounds.orEmpty().fold(0) { acc, round ->
+                acc + (round.deltas?.getOrNull(p)
+                    ?: if (p in round.teamAPlayers) round.value else -round.value)
+            }
+        }
+    }
+
     fun toJson(): JSONObject {
         val obj = JSONObject()
         obj.put("id", id)

@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -42,8 +43,9 @@ fun TeamRoundsScreen(
     onAddRound: () -> Unit
 ) {
     val players = viewModel.players
-    val rankingOrder = viewModel.rankingOrder()
     val rounds = viewModel.teamRounds
+
+    KeepScreenOn()
 
     var justSaved by remember { mutableStateOf(false) }
     LaunchedEffect(justSaved) {
@@ -77,24 +79,10 @@ fun TeamRoundsScreen(
                         RulesButton(rules = viewModel.gameRules)
                     }
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Button(onClick = {
-                        historyRepository.saveGame(viewModel.snapshot())
-                        justSaved = true
-                    }) {
-                        Text("Enregistrer")
-                    }
-                    if (justSaved) {
-                        Text(
-                            text = "Partie enregistrée",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White
-                        )
-                    }
-                }
             }
             Spacer(modifier = Modifier.height(12.dp))
 
+            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.93f)),
                 modifier = Modifier.fillMaxWidth()
@@ -110,7 +98,7 @@ fun TeamRoundsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (rank == 1 && rankingOrder.isNotEmpty()) {
+                            if (viewModel.isLeader(index)) {
                                 Icon(
                                     imageVector = Icons.Filled.EmojiEvents,
                                     contentDescription = "Premier",
@@ -123,7 +111,13 @@ fun TeamRoundsScreen(
                         }
                     }
 
-                    Button(onClick = onAddRound, modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = {
+                            viewModel.editingTeamRoundIndex = null
+                            onAddRound()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text("+ Nouvelle manche")
                     }
 
@@ -154,6 +148,14 @@ fun TeamRoundsScreen(
                                         modifier = Modifier.weight(1f),
                                         style = MaterialTheme.typography.bodySmall
                                     )
+                                    if (round.tarotInput != null) {
+                                        IconButton(onClick = {
+                                            viewModel.editingTeamRoundIndex = index
+                                            onAddRound()
+                                        }) {
+                                            Icon(Icons.Filled.Edit, contentDescription = "Modifier cette manche")
+                                        }
+                                    }
                                     IconButton(onClick = { viewModel.removeTeamRound(index) }) {
                                         Icon(Icons.Filled.Close, contentDescription = "Supprimer cette manche")
                                     }
@@ -162,6 +164,18 @@ fun TeamRoundsScreen(
                         }
                     }
                 }
+            }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    historyRepository.saveGame(viewModel.snapshot())
+                    justSaved = true
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (justSaved) "Partie enregistrée ✓" else "Enregistrer")
             }
         }
     }

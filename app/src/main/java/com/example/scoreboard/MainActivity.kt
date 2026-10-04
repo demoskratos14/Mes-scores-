@@ -2,13 +2,20 @@ package com.example.scoreboard
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,9 +25,25 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 
 class MainActivity : ComponentActivity() {
+
+    // Même instance que celle récupérée par viewModel() dans ScoreApp (même Activity, même clé).
+    private val scoreViewModel: ScoreViewModel by viewModels()
+
+    /**
+     * Sauvegarde automatique : dès que l'appli quitte l'écran (retour à l'accueil, autre appli…),
+     * la partie en cours est enregistrée dans le journal. Si Android ferme ensuite l'appli en
+     * arrière-plan, la partie reste récupérable via « Reprendre ».
+     */
+    override fun onStop() {
+        super.onStop()
+        if (scoreViewModel.hasProgress()) {
+            GameHistoryRepository(this).saveGame(scoreViewModel.snapshot())
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Nécessaire pour que Modifier.imePadding() fonctionne correctement et que le
@@ -49,6 +72,26 @@ fun ScoreApp() {
     val context = LocalContext.current
     val gameRepository = remember { GameRepository(context) }
     val gameHistoryRepository = remember { GameHistoryRepository(context) }
+
+    // Le minuteur vibre et sonne à la fin, même si on est sur un autre écran.
+    DisposableEffect(timerViewModel) {
+        timerViewModel.onFinished = { TimerAlert.play(context) }
+        onDispose { timerViewModel.onFinished = null }
+    }
+
+    // Quitter une partie qui contient des scores demande confirmation.
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+    val onScoreRoute = currentRoute == "score" || currentRoute == "counter" || currentRoute == "teamRounds"
+    var showQuitDialog by remember { mutableStateOf(false) }
+    BackHandler(enabled = onScoreRoute && viewModel.hasProgress()) { showQuitDialog = true }
+
+    fun quitGame(save: Boolean) {
+        if (save) gameHistoryRepository.saveGame(viewModel.snapshot())
+        viewModel.closeGame()
+        showQuitDialog = false
+        navController.popBackStack("setup", inclusive = false)
+    }
 
     // Noms saisis à l'étape 1, en attente d'être associés à un jeu à l'étape 2.
     var pendingPlayerNames by remember { mutableStateOf(listOf<String>()) }
@@ -149,5 +192,26 @@ fun ScoreApp() {
 
         // Superposé à toutes les pages ci-dessus.
         TimerOverlay(viewModel = timerViewModel)
+
+        if (showQuitDialog) {
+            AlertDialog(
+                onDismissRequest = { showQuitDialog = false },
+                title = { Text("Quitter la partie ?") },
+                text = {
+                    Column {
+                        Text("La partie est en cours. Veux-tu l'enregistrer avant de quitter ?")
+                        TextButton(onClick = { quitGame(save = false) }) {
+                            Text("Quitter sans enregistrer", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { quitGame(save = true) }) { Text("Enregistrer et quitter") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showQuitDialog = false }) { Text("Continuer la partie") }
+                }
+            )
+        }
     }
 }

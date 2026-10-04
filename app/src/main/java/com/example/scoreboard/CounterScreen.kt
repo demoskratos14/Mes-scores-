@@ -1,6 +1,8 @@
 package com.example.scoreboard
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,7 +38,8 @@ import kotlinx.coroutines.delay
 @Composable
 fun CounterScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryRepository) {
     val players = viewModel.players
-    val rankingOrder = viewModel.rankingOrder()
+
+    KeepScreenOn()
 
     var justSaved by remember { mutableStateOf(false) }
     LaunchedEffect(justSaved) {
@@ -65,25 +68,13 @@ fun CounterScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryRepos
                         color = Color.White.copy(alpha = 0.85f)
                     )
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Button(onClick = {
-                        historyRepository.saveGame(viewModel.snapshot())
-                        justSaved = true
-                    }) {
-                        Text("Enregistrer")
-                    }
-                    if (justSaved) {
-                        Text(
-                            text = "Partie enregistrée",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White
-                        )
-                    }
-                }
             }
             Spacer(modifier = Modifier.height(12.dp))
 
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 players.forEachIndexed { index, name ->
                     val rank = viewModel.rankOf(index)
                     Card(
@@ -94,7 +85,7 @@ fun CounterScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryRepos
                             modifier = Modifier.fillMaxWidth().padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (rank == 1 && rankingOrder.isNotEmpty()) {
+                            if (viewModel.isLeader(index)) {
                                 Icon(
                                     imageVector = Icons.Filled.EmojiEvents,
                                     contentDescription = "Premier",
@@ -129,6 +120,17 @@ fun CounterScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryRepos
                         }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    historyRepository.saveGame(viewModel.snapshot())
+                    justSaved = true
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (justSaved) "Partie enregistrée ✓" else "Enregistrer")
             }
         }
     }
