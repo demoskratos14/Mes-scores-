@@ -127,6 +127,8 @@ data class BonusRule(
  *   au comportement, qui reste piloté par [scoreMode].
  * @param scoringFormula comment le score d'une manche est calculé (saisie directe, multiplicateur,
  *   contrat). Purement descriptif pour l'instant, comme [teamMode].
+ * @param minPlayers nombre minimum de joueurs pour créer une feuille de score.
+ * @param maxPlayers nombre maximum de joueurs pour créer une feuille de score.
  * @param roundBonuses bonus optionnels proposés à la cochée pour ce jeu (ex : "Petit au bout"
  *   pour le Tarot). Non encore appliqués au calcul des scores.
  */
@@ -140,7 +142,9 @@ data class GameRules(
     val endCondition: EndCondition = EndCondition(),
     val teamMode: TeamMode = TeamMode.INDIVIDUAL,
     val scoringFormula: ScoringFormula = ScoringFormula.DIRECT_ENTRY,
-    val roundBonuses: List<BonusRule> = emptyList()
+    val roundBonuses: List<BonusRule> = emptyList(),
+    val minPlayers: Int = DEFAULT_MIN_PLAYERS,
+    val maxPlayers: Int = DEFAULT_MAX_PLAYERS
 ) {
     /** Sérialise cette règle en JSON, pour la sauvegarde dans les SharedPreferences. */
     fun toJson(): JSONObject {
@@ -150,6 +154,8 @@ data class GameRules(
         obj.put("lowestWins", lowestWins)
         obj.put("allowNegativeScores", allowNegativeScores)
         obj.put("scoreMode", scoreMode.name)
+        obj.put("minPlayers", minPlayers)
+        obj.put("maxPlayers", maxPlayers)
 
         val multipliersArray = JSONArray()
         multipliers.forEach { m ->
@@ -188,6 +194,8 @@ data class GameRules(
     }
 
     companion object {
+        const val DEFAULT_MIN_PLAYERS = 1
+        const val DEFAULT_MAX_PLAYERS = 12
         const val NORMAL_MULTIPLIER_ID = "normal"
         val NORMAL_MULTIPLIER = ScoreMultiplier(NORMAL_MULTIPLIER_ID, "Normal", factor = 1, bonus = 0)
 
@@ -295,7 +303,9 @@ data class GameRules(
                 endCondition = endCondition,
                 teamMode = teamMode,
                 scoringFormula = scoringFormula,
-                roundBonuses = roundBonuses
+                roundBonuses = roundBonuses,
+                minPlayers = obj.optInt("minPlayers", DEFAULT_MIN_PLAYERS),
+                maxPlayers = obj.optInt("maxPlayers", DEFAULT_MAX_PLAYERS)
             )
         }
     }

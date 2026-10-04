@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -102,6 +103,7 @@ fun ScoreScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryReposit
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .navigationBarsPadding()
                 .padding(16.dp)
         ) {
             Row(

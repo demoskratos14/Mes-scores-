@@ -2,11 +2,13 @@ package com.example.scoreboard
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -62,13 +64,22 @@ fun SetupScreen(
     }
 
     AppBackground {
-        Column(
+        // Toute la page défile : avec le clavier ouvert, on peut faire remonter les champs
+        // (et le bouton) sans avoir à fermer le clavier.
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
-                .imePadding(),
-            verticalArrangement = Arrangement.Center
+                .navigationBarsPadding()
+                .imePadding()
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = maxHeight)
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = Color.White.copy(alpha = 0.93f)
@@ -93,10 +104,7 @@ fun SetupScreen(
                     )
 
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 320.dp)
-                            .verticalScroll(rememberScrollState()),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         names.forEachIndexed { index, name ->
@@ -136,6 +144,7 @@ fun SetupScreen(
                         Text("Journal des parties")
                     }
                 }
+            }
             }
         }
     }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -50,7 +51,7 @@ fun CounterScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryRepos
     }
 
     AppBackground {
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxSize().navigationBarsPadding().padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

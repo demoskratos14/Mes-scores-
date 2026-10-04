@@ -29,6 +29,8 @@ class GameRepository(context: Context) {
         GameRules(
             id = "builtin_skyjo",
             name = "Skyjo",
+            minPlayers = 2,
+            maxPlayers = 8,
             lowestWins = true,
             allowNegativeScores = true,
             scoreMode = ScoreMode.TABLE,
@@ -37,6 +39,8 @@ class GameRepository(context: Context) {
         GameRules(
             id = "builtin_tarot",
             name = "Tarot",
+            minPlayers = 3,
+            maxPlayers = 5,
             lowestWins = false,
             allowNegativeScores = true,
             scoreMode = ScoreMode.VARIABLE_TEAMS,
@@ -52,6 +56,8 @@ class GameRepository(context: Context) {
         GameRules(
             id = "builtin_belote",
             name = "Belote (à 501 points)",
+            minPlayers = 2,
+            maxPlayers = 4,
             lowestWins = false,
             allowNegativeScores = false,
             scoreMode = ScoreMode.TABLE,
@@ -60,6 +66,8 @@ class GameRepository(context: Context) {
         GameRules(
             id = "builtin_rami",
             name = "Rami",
+            minPlayers = 2,
+            maxPlayers = 6,
             lowestWins = true,
             allowNegativeScores = false,
             scoreMode = ScoreMode.TABLE,
@@ -68,6 +76,8 @@ class GameRepository(context: Context) {
         GameRules(
             id = "builtin_uno",
             name = "Uno",
+            minPlayers = 2,
+            maxPlayers = 10,
             lowestWins = false,
             allowNegativeScores = false,
             scoreMode = ScoreMode.TABLE

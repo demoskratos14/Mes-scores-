@@ -84,7 +84,6 @@ fun ScoreApp() {
     val currentRoute = backStackEntry?.destination?.route
     val onScoreRoute = currentRoute == "score" || currentRoute == "counter" || currentRoute == "teamRounds"
     var showQuitDialog by remember { mutableStateOf(false) }
-    BackHandler(enabled = onScoreRoute && viewModel.hasProgress()) { showQuitDialog = true }
 
     fun quitGame(save: Boolean) {
         if (save) gameHistoryRepository.saveGame(viewModel.snapshot())
@@ -149,6 +148,7 @@ fun ScoreApp() {
             composable("chooseGame") {
                 ChooseGameScreen(
                     repository = gameRepository,
+                    playerCount = pendingPlayerNames.size,
                     onGameChosen = { rules ->
                         viewModel.initGame(pendingPlayerNames, rules)
                         navController.navigate(scoreRouteFor(rules))
@@ -189,6 +189,10 @@ fun ScoreApp() {
                 )
             }
         }
+
+        // Doit être déclaré APRÈS le NavHost : le dernier BackHandler enregistré est prioritaire,
+        // sinon celui du NavHost quitte l'écran sans jamais afficher la confirmation.
+        BackHandler(enabled = onScoreRoute && viewModel.hasProgress()) { showQuitDialog = true }
 
         // Superposé à toutes les pages ci-dessus.
         TimerOverlay(viewModel = timerViewModel)

@@ -36,6 +36,7 @@ private val LONG_GAME_TOGGLE_IDS = setOf("builtin_belote", "builtin_rami")
 @Composable
 fun ChooseGameScreen(
     repository: GameRepository,
+    playerCount: Int,
     onGameChosen: (GameRules) -> Unit,
     onCreateNewGame: () -> Unit
 ) {
@@ -46,6 +47,7 @@ fun ChooseGameScreen(
     var expanded by remember { mutableStateOf(false) }
     var longGame by remember { mutableStateOf(false) }
     var genericMode by remember { mutableStateOf(ScoreMode.TABLE) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     AppBackground {
         Column(
@@ -92,6 +94,7 @@ fun ChooseGameScreen(
                                     },
                                     onClick = {
                                         selected = game
+                                        errorMessage = null
                                         expanded = false
                                     }
                                 )
@@ -147,8 +150,18 @@ fun ChooseGameScreen(
                         Text("+ Créer un nouveau jeu")
                     }
 
+                    errorMessage?.let { message ->
+                        Text(
+                            text = message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
                     Button(
                         onClick = {
+                            errorMessage = playerCountError(selected, playerCount)
+                            if (errorMessage != null) return@Button
                             val finalRules = when {
                                 selected.id == "builtin_generic" -> selected.copy(scoreMode = genericMode)
                                 selected.id in LONG_GAME_TOGGLE_IDS -> selected.copy(
@@ -171,8 +184,25 @@ fun ChooseGameScreen(
     }
 }
 
+/** Message d'erreur si le nombre de joueurs ne convient pas au jeu, sinon null. */
+private fun playerCountError(game: GameRules, playerCount: Int): String? = when {
+    playerCount < game.minPlayers ->
+        "${game.name} se joue à ${playersRange(game)}. Tu as saisi $playerCount joueur${if (playerCount > 1) "s" else ""} : " +
+            "il en faut au moins ${game.minPlayers}. Reviens en arrière pour en ajouter."
+    playerCount > game.maxPlayers ->
+        "${game.name} se joue à ${playersRange(game)}. Tu as saisi $playerCount joueurs : " +
+            "il n'en faut pas plus de ${game.maxPlayers}. Reviens en arrière pour en retirer."
+    else -> null
+}
+
+private fun playersRange(game: GameRules): String =
+    if (game.minPlayers == game.maxPlayers) "${game.minPlayers} joueurs"
+    else "${game.minPlayers} à ${game.maxPlayers} joueurs"
+
 private fun ruleSummary(game: GameRules): String {
     val direction = if (game.lowestWins) "le plus petit score gagne" else "le plus grand score gagne"
     val negative = if (game.allowNegativeScores) "scores négatifs autorisés" else "scores positifs uniquement"
-    return "$direction · $negative"
+    val players = if (game.minPlayers == GameRules.DEFAULT_MIN_PLAYERS && game.maxPlayers == GameRules.DEFAULT_MAX_PLAYERS) ""
+    else " · ${playersRange(game)}"
+    return "$direction · $negative$players"
 }
