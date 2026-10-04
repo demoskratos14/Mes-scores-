@@ -53,20 +53,27 @@ class TournamentViewModel : ViewModel() {
         var bracketSize = 1
         while (bracketSize < names.size) bracketSize *= 2
 
-        val slots: MutableList<Int?> = names.indices.toMutableList()
-        while (slots.size < bracketSize) slots.add(null)
-        slots.shuffle()
+        // Les qualifications directes (byes) sont réparties à raison d'une par match au maximum :
+        // deux places vides face à face donneraient un match impossible à jouer.
+        val byeCount = bracketSize - names.size
+        val order = names.indices.shuffled()
+        val pairings = mutableListOf<Pair<Int, Int?>>()
+        for (k in 0 until byeCount) pairings.add(order[k] to null)
+        var k = byeCount
+        while (k + 1 < order.size) {
+            pairings.add(order[k] to order[k + 1])
+            k += 2
+        }
+        pairings.shuffle()
 
         val firstRound = mutableStateListOf<TournamentMatch>()
-        var i = 0
-        while (i < slots.size) {
+        pairings.forEach { (playerA, playerB) ->
             firstRound.add(
                 TournamentMatch(round = 1).apply {
-                    playerAIndex = slots[i]
-                    playerBIndex = slots.getOrNull(i + 1)
+                    playerAIndex = playerA
+                    playerBIndex = playerB
                 }
             )
-            i += 2
         }
         _rounds.add(firstRound)
         resolveByes()
@@ -92,6 +99,37 @@ class TournamentViewModel : ViewModel() {
     fun thirdPlaceIndex(): Int? {
         val last = _rounds.lastOrNull() ?: return null
         return last.find { it.label == "Petite finale" }?.winnerIndex
+    }
+
+    /**
+     * Classement final, de la 1re place à la 4e au maximum : vainqueur et perdant de la finale,
+     * puis vainqueur et perdant de la petite finale. À 3 participants (pas de petite finale),
+     * la 3e place revient au perdant du seul match réellement joué au premier tour.
+     * Liste vide tant que le championnat n'est pas terminé.
+     */
+    fun podium(): List<Int> {
+        if (!finished) return emptyList()
+        val last = _rounds.lastOrNull() ?: return emptyList()
+        val finalMatch = last.find { it.label == "Finale" } ?: last.singleOrNull() ?: return emptyList()
+
+        val result = mutableListOf<Int>()
+        finalMatch.winnerIndex?.let { result.add(it) }
+        loserOf(finalMatch)?.let { result.add(it) }
+
+        val smallFinal = last.find { it.label == "Petite finale" }
+        if (smallFinal != null) {
+            smallFinal.winnerIndex?.let { result.add(it) }
+            loserOf(smallFinal)?.let { result.add(it) }
+        } else if (_rounds.size >= 2) {
+            val eliminated = _rounds[_rounds.size - 2].filter { !it.isBye }.mapNotNull { loserOf(it) }
+            if (eliminated.size == 1) result.add(eliminated.first())
+        }
+        return result
+    }
+
+    private fun loserOf(match: TournamentMatch): Int? {
+        val winner = match.winnerIndex ?: return null
+        return if (match.playerAIndex == winner) match.playerBIndex else match.playerAIndex
     }
 
     // Auto-qualifie les matchs sans adversaire (byes), en cascade si besoin.

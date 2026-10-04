@@ -47,16 +47,25 @@ fun TournamentBracketScreen(
             )
 
             if (viewModel.finished) {
-                val champion = viewModel.championIndex()?.let { players.getOrNull(it) }
-                val third = viewModel.thirdPlaceIndex()?.let { players.getOrNull(it) }
+                val podium = viewModel.podium()
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF59D)),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("🏆 Champion : ${champion ?: "?"}", fontWeight = FontWeight.Bold)
-                        third?.let {
-                            Text("🥉 3e place : $it", style = MaterialTheme.typography.bodyMedium)
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Classement final", style = MaterialTheme.typography.labelMedium)
+                        podium.forEachIndexed { place, playerIndex ->
+                            val name = players.getOrNull(playerIndex) ?: "?"
+                            Text(
+                                text = when (place) {
+                                    0 -> "🏆 Champion : $name"
+                                    1 -> "🥈 2e place : $name"
+                                    2 -> "🥉 3e place : $name"
+                                    else -> "4e place : $name"
+                                },
+                                fontWeight = if (place == 0) FontWeight.Bold else FontWeight.Normal,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
                         }
                     }
                 }
