@@ -35,6 +35,11 @@ private fun TeamRound.toJson(): JSONObject {
     teamAPlayers.forEach { playersArray.put(it) }
     obj.put("teamAPlayers", playersArray)
     obj.put("value", value)
+    deltas?.let { list ->
+        val deltasArray = JSONArray()
+        list.forEach { deltasArray.put(it) }
+        obj.put("deltas", deltasArray)
+    }
     return obj
 }
 
@@ -48,7 +53,10 @@ private fun teamRoundFromJson(obj: JSONObject): TeamRound {
     return TeamRound(
         teamALabel = obj.getString("teamALabel"),
         teamAPlayers = playersSet,
-        value = obj.getInt("value")
+        value = obj.getInt("value"),
+        deltas = obj.optJSONArray("deltas")?.let { array ->
+            (0 until array.length()).map { array.getInt(it) }
+        }
     )
 }
 

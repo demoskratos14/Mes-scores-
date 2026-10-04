@@ -34,7 +34,13 @@ class CellState {
 data class TeamRound(
     val teamALabel: String,
     val teamAPlayers: Set<Int>,
-    val value: Int
+    val value: Int,
+    /**
+     * Points exacts gagnés ou perdus par chaque joueur (même index que la liste des joueurs),
+     * pour les jeux qui répartissent le score de façon inégale (Tarot). Si null, on applique
+     * la règle simple : [value] à l'équipe A et son opposé aux autres joueurs.
+     */
+    val deltas: List<Int>? = null
 )
 
 /**
@@ -229,6 +235,11 @@ class ScoreViewModel : ViewModel() {
         _teamRounds.add(TeamRound(teamALabel, teamAPlayers, value))
     }
 
+    /** Ajoute une manche dont les points de chaque joueur ont déjà été calculés (voir [TeamRound.deltas]). */
+    fun addDetailedTeamRound(teamALabel: String, teamAPlayers: Set<Int>, value: Int, deltas: List<Int>) {
+        _teamRounds.add(TeamRound(teamALabel, teamAPlayers, value, deltas))
+    }
+
     fun removeTeamRound(index: Int) {
         if (index in _teamRounds.indices) _teamRounds.removeAt(index)
     }
@@ -242,7 +253,10 @@ class ScoreViewModel : ViewModel() {
         ScoreMode.COUNTER ->
             _counters.getOrNull(player) ?: 0
         ScoreMode.VARIABLE_TEAMS ->
-            _teamRounds.sumOf { round -> if (player in round.teamAPlayers) round.value else -round.value }
+            _teamRounds.sumOf { round ->
+                round.deltas?.getOrNull(player)
+                    ?: if (player in round.teamAPlayers) round.value else -round.value
+            }
     }
 
     /** Index des joueurs triés du meilleur score au moins bon, selon les règles du jeu. */

@@ -1,8 +1,17 @@
 package com.example.scoreboard
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,11 +22,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -30,7 +36,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -40,11 +45,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -52,7 +55,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 // Hauteurs fixes pour que toutes les colonnes restent alignées entre elles.
 private val RANK_ROW_HEIGHT = 40.dp
@@ -100,7 +102,6 @@ fun ScoreScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryReposit
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp)
-                .imePadding()
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -113,25 +114,15 @@ fun ScoreScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryReposit
                         style = MaterialTheme.typography.headlineSmall,
                         color = Color.White
                     )
-                    Text(
-                        text = viewModel.gameRules.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.85f)
-                    )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Button(onClick = {
-                        historyRepository.saveGame(viewModel.snapshot())
-                        justSaved = true
-                    }) {
-                        Text("Enregistrer")
-                    }
-                    if (justSaved) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Partie enregistrée",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White
+                            text = viewModel.gameRules.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.weight(1f, fill = false)
                         )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        RulesButton(rules = viewModel.gameRules)
                     }
                 }
             }
@@ -274,6 +265,17 @@ fun ScoreScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryReposit
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    historyRepository.saveGame(viewModel.snapshot())
+                    justSaved = true
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (justSaved) "Partie enregistrée ✓" else "Enregistrer")
+            }
         }
     }
 
@@ -290,13 +292,12 @@ fun ScoreScreen(viewModel: ScoreViewModel, historyRepository: GameHistoryReposit
 }
 
 /**
- * Champ de saisie numérique pour une case du tableau : bouton +/− pour le signe
- * (si les scores négatifs sont autorisés), et sélecteur de règle de multiplication
- * au-dessus du champ (si le jeu en a défini plusieurs). Le texte saisi est affiché
- * dans la couleur du joueur.
+ * Case du tableau : elle n'affiche que le score (dans la couleur du joueur).
+ * Un clic ouvre une fenêtre de saisie (voir [ScoreInputDialog]) où l'on écrit le
+ * score et, si les scores négatifs sont autorisés, choisit le signe. Le sélecteur de
+ * règle de multiplication reste au-dessus de la case (si le jeu en a plusieurs).
  */
 @Composable
-@OptIn(ExperimentalFoundationApi::class)
 private fun ScoreCell(
     cell: CellState,
     allowNegative: Boolean,
@@ -304,8 +305,7 @@ private fun ScoreCell(
     playerColor: Color,
     onChanged: () -> Unit
 ) {
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    val coroutineScope = rememberCoroutineScope()
+    var showDialog by remember { mutableStateOf(false) }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         if (multipliers.size > 1) {
@@ -336,39 +336,104 @@ private fun ScoreCell(
             }
         }
 
-        OutlinedTextField(
-            value = cell.baseValue?.toString() ?: "",
-            onValueChange = { newText ->
-                cell.baseValue = newText.filter { it.isDigit() }.toIntOrNull()
-                onChanged()
-            },
-            textStyle = LocalTextStyle.current.copy(color = playerColor),
-            leadingIcon = if (allowNegative) {
-                {
-                    Text(
-                        text = if (cell.isNegative) "−" else "+",
-                        fontWeight = FontWeight.Bold,
-                        color = if (cell.isNegative) Color(0xFFD32F2F) else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .clickable {
-                                cell.isNegative = !cell.isNegative
-                                onChanged()
-                            }
-                            .padding(horizontal = 6.dp)
-                    )
-                }
-            } else null,
+        val base = cell.baseValue
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 2.dp, vertical = 4.dp)
-                .bringIntoViewRequester(bringIntoViewRequester)
-                .onFocusEvent { state ->
-                    if (state.isFocused) {
-                        coroutineScope.launch { bringIntoViewRequester.bringIntoView() }
-                    }
-                },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                .height(48.dp)
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { showDialog = true },
+            contentAlignment = Alignment.Center
+        ) {
+            if (base != null) {
+                Text(
+                    text = (if (cell.isNegative) "−" else "") + base,
+                    color = playerColor,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
+        }
+    }
+
+    if (showDialog) {
+        ScoreInputDialog(
+            initialValue = cell.baseValue,
+            initialNegative = cell.isNegative,
+            allowNegative = allowNegative,
+            onConfirm = { value, negative ->
+                cell.baseValue = value
+                cell.isNegative = negative
+                showDialog = false
+                onChanged()
+            },
+            onDismiss = { showDialog = false }
         )
     }
+}
+
+/** Fenêtre de saisie d'un score : champ numérique plein format + bascule +/− éventuelle. */
+@Composable
+private fun ScoreInputDialog(
+    initialValue: Int?,
+    initialNegative: Boolean,
+    allowNegative: Boolean,
+    onConfirm: (Int?, Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val initialText = initialValue?.toString() ?: ""
+    // Texte présélectionné : taper un nouveau score remplace directement l'ancien.
+    var field by remember { mutableStateOf(TextFieldValue(initialText, TextRange(0, initialText.length))) }
+    var negative by remember { mutableStateOf(initialNegative) }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    val confirm = { onConfirm(field.text.toIntOrNull(), negative) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Saisir le score") },
+        text = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (allowNegative) {
+                    OutlinedButton(
+                        onClick = { negative = !negative },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = if (negative) "−" else "+",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = if (negative) Color(0xFFD32F2F) else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = field,
+                    onValueChange = { input ->
+                        field = input.copy(text = input.text.filter { it.isDigit() })
+                    },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.headlineSmall,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { confirm() }),
+                    modifier = Modifier.weight(1f).focusRequester(focusRequester)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { confirm() }) { Text("OK") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler") }
+        }
+    )
 }

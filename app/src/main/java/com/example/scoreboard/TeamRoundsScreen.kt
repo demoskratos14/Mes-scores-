@@ -1,6 +1,7 @@
 package com.example.scoreboard
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -65,11 +66,16 @@ fun TeamRoundsScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         color = Color.White
                     )
-                    Text(
-                        text = viewModel.gameRules.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.85f)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = viewModel.gameRules.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        RulesButton(rules = viewModel.gameRules)
+                    }
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Button(onClick = {
@@ -136,7 +142,15 @@ fun TeamRoundsScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Manche ${index + 1} — ${round.teamALabel} : ${if (round.value >= 0) "+" else ""}${round.value}",
+                                        text = if (round.deltas != null) {
+                                            "Manche ${index + 1} — ${round.teamALabel}\n" +
+                                                players.indices.joinToString(" · ") { p ->
+                                                    val d = round.deltas.getOrElse(p) { 0 }
+                                                    "${players[p]} ${if (d > 0) "+" else if (d < 0) "−" else ""}${kotlin.math.abs(d)}"
+                                                }
+                                        } else {
+                                            "Manche ${index + 1} — ${round.teamALabel} : ${if (round.value >= 0) "+" else ""}${round.value}"
+                                        },
                                         modifier = Modifier.weight(1f),
                                         style = MaterialTheme.typography.bodySmall
                                     )

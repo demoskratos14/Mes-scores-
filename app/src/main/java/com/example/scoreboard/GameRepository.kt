@@ -55,7 +55,7 @@ class GameRepository(context: Context) {
             lowestWins = false,
             allowNegativeScores = false,
             scoreMode = ScoreMode.TABLE,
-            endCondition = EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = 500)
+            endCondition = EndCondition(type = EndConditionType.SCORE_THRESHOLD, scoreThreshold = 501)
         ),
         GameRules(
             id = "builtin_rami",
